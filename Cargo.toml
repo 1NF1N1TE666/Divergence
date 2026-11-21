@@ -1,0 +1,212 @@
+[package]
+name = "divergence"
+version = "0.0.0-dev"
+authors = ["1NF1N1TE, HDR Development Team"]
+edition = "2018"
+
+[package.metadata.skyline]
+titleid = "01006A800016E000"
+
+[dependencies]
+skyline = { git = "https://github.com/ultimate-research/skyline-rs" }
+skyline_smash = { git = "https://github.com/ultimate-research/skyline-smash", features = ["weak_l2cvalue"] }
+smash_script = { git = "https://github.com/WuBoytH/smash-script", branch = "development" }
+smashline = { git = "https://github.com/HDR-Development/smashline" }
+smash_rs = { package = "smash", git = "https://github.com/WuBoytH/smash-rs" }
+bitflags = "2"
+modular-bitfield = "0.11.2"
+
+[patch.crates-io]
+nnsdk = { git = "https://github.com/ultimate-research/nnsdk-rs" }
+
+[features]
+default = [
+    "bayonetta",
+    "brave",
+    "buddy",
+    "captain",
+    "chrom",
+    "daisy",
+    "dedede",
+    "demon",
+    "diddy",
+    "dolly",
+    "donkey",
+    "duckhunt",
+    "edge",
+    "eflame",
+    "elight",
+    "falco",
+    "fox",
+    "gamewatch",
+    "ganon",
+    "gaogaen",
+    "gekkouga",
+    "iceclimber",
+    "ike",
+    "inkling",
+    "jack",
+    "kamui",
+    "ken",
+    "kirby",
+    "koopa",
+    "koopajr",
+    "krool",
+    "link",
+    "littlemac",
+    "lucario",
+    "lucas",
+    "lucina",
+    "luigi",
+    "mario",
+    "mariod",
+    "marth",
+    "master",
+    "metaknight",
+    "mewtwo",
+    "miifighter",
+    "miigunner",
+    "miiswordsman",
+    "murabito",
+    "ness",
+    "packun",
+    "pacman",
+    "palutena",
+    "peach",
+    "pfushigisou",
+    "pichu",
+    "pickel",
+    "pikachu",
+    "pikmin",
+    "pit",
+    "pitb",
+    "plizardon",
+    "purin",
+    "pzenigame",
+    "reflet",
+    "richter",
+    "ridley",
+    "robot",
+    "rockman",
+    "rosetta",
+    "roy",
+    "ryu",
+    "samus",
+    "samusd",
+    "sheik",
+    "shizue",
+    "shulk",
+    "simon",
+    "snake",
+    "sonic",
+    "szerosuit",
+    "tantan",
+    "toonlink",
+    "trail",
+    "wario",
+    "wiifit",
+    "wolf",
+    "yoshi",
+    "younglink",
+    "zelda",
+]
+bayonetta = []
+brave = []
+buddy = []
+captain = []
+chrom = []
+daisy = []
+dedede = []
+demon = []
+diddy = []
+dolly = []
+donkey = []
+duckhunt = []
+edge = []
+eflame = []
+elight = []
+falco = []
+fox = []
+gamewatch = []
+ganon = []
+gaogaen = []
+gekkouga = []
+iceclimber = []
+ike = []
+inkling = []
+jack = []
+kamui = []
+ken = []
+kirby = []
+koopa = []
+koopajr = []
+krool = []
+link = []
+littlemac = []
+lucario = []
+lucas = []
+lucina = []
+luigi = []
+mario = []
+mariod = []
+marth = []
+master = []
+metaknight = []
+mewtwo = []
+miifighter = []
+miigunner = []
+miiswordsman = []
+murabito = []
+ness = []
+packun = []
+pacman = []
+palutena = []
+peach = []
+pfushigisou = []
+pichu = []
+pickel = []
+pikachu = []
+pikmin = []
+pit = []
+pitb = []
+plizardon = []
+purin = []
+pzenigame = []
+reflet = []
+richter = []
+ridley = []
+robot = []
+rockman = []
+rosetta = []
+roy = []
+ryu = []
+samus = []
+samusd = []
+sheik = []
+shizue = []
+shulk = []
+simon = []
+snake = []
+sonic = []
+szerosuit = []
+tantan = []
+toonlink = []
+trail = []
+wario = []
+wiifit = []
+wolf = []
+yoshi = []
+younglink = []
+zelda = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+opt-level = 'z'
+panic = "abort"
+lto = true
+codegen-units = 1
+
+[lib]
+crate-type = ["cdylib"]
