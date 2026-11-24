@@ -1,5 +1,7 @@
 use super::*;
 
+// hdr: HDR's hitstun physics (fighters/common/src/function_hooks/energy/damage.rs): hitstun uses the
+// fighter's own gravity and fall speed, plus the patches in install(). the gravity reads are changed
 #[skyline::hook(offset = 0x6d2498, inline)]
 unsafe fn hitstun_gravity_1(ctx: &mut skyline::hooks::InlineCtx) {
     let work_module = ctx.registers[19].x();
@@ -48,6 +50,7 @@ unsafe fn hitstun_fall_speed_3(ctx: &mut skyline::hooks::InlineCtx) {
     ctx.registers_f[0].set_s(air_speed_y_stable)
 }
 
+// hdr: this and attack_module_set_power_hook_pattern are HDR's (fighters/common/src/function_hooks/attack.rs)
 #[skyline::hook(offset = 0x46b648, inline)]
 unsafe fn get_hitstop_mul(ctx: &mut skyline::hooks::InlineCtx) {
     if ctx.registers[1].w() == 0x2 {

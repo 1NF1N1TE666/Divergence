@@ -1,5 +1,6 @@
 use super::*;
 
+// hdr: the two stick flick counters are based on HDR's (fighters/common/src/opff/other.rs)
 pub extern "C" fn left_stick_flick_counter(fighter: &mut L2CFighterCommon) {
     unsafe {
         if fighter.left_stick_x() == 0.0 {
@@ -124,6 +125,44 @@ pub unsafe extern "C" fn slide_off_air(fighter: &mut L2CFighterCommon) {
     function_hooks::lua_bind_hook::keep_slide_off_air(fighter.boma());
 }
 
+// claude code: slide-off physics for statuses slide_off_air doesn't know: a slotted moveset's own
+// statuses (and vanilla specials) slide off edges too, but never ask for FALL, so they drifted on at
+// ground height. a status that asked to stop at edges (EDGE_STOP_SLIPPED, lua_bind_hook.rs) and is
+// now really in the air gets the same gravity and fall speed cap a slid-off attack gets, every frame
+// (its own code may switch them back off). touching down puts it back on ground correction
+pub unsafe extern "C" fn slide_off_own_status(fighter: &mut L2CFighterCommon) {
+    let object = fighter.battle_object;
+    let started = VarModule::is_flag(object, vars::common::status::SLID_OFF_OWN_STATUS);
+    if VarModule::is_flag(object, vars::common::instance::SLIDE_OFF_AIR)
+    || modes::faux_air::is_airborne(fighter.boma())
+    || modes::faux_air::is_faux_ground(fighter.boma())
+    || (!started && !VarModule::is_flag(object, vars::common::status::EDGE_STOP_SLIPPED)) {
+        return;
+    }
+    if !started {
+        // one frame's grace: a status that handles leaving the ground itself (vanilla specials switch
+        // to their air version) will have put itself on air correction by then and is left alone
+        if !fighter.is_situation(*SITUATION_KIND_AIR)
+        || StatusModule::is_situation_changed(fighter.module_accessor)
+        || GroundModule::get_correct(fighter.module_accessor) == *GROUND_CORRECT_KIND_AIR
+        || function_hooks::lua_bind_hook::is_slide_off_kind(fighter.status()) {
+            return;
+        }
+        VarModule::on_flag(object, vars::common::status::SLID_OFF_OWN_STATUS);
+        VarModule::set_float(object, vars::common::instance::SLIDE_OFF_SPEED_Y, 0.0);
+        let fall_speed = fighter.get_param_float("air_speed_y_stable", "");
+        function_hooks::air_physics(fighter.boma(), 0.0, fall_speed);
+        return;
+    }
+    if GroundModule::is_touch(fighter.module_accessor, *GROUND_TOUCH_FLAG_DOWN as u32) {
+        VarModule::off_flag(object, vars::common::status::SLID_OFF_OWN_STATUS);
+        GroundModule::correct(fighter.module_accessor, GroundCorrectKind(*GROUND_CORRECT_KIND_GROUND));
+        KineticModule::unable_energy(fighter.module_accessor, *FIGHTER_KINETIC_ENERGY_ID_GRAVITY);
+        return;
+    }
+    function_hooks::lua_bind_hook::keep_slide_off_air(fighter.boma());
+}
+
 // claude code: counts down the parry window (general_statuses/parry.rs) and closes it at 0, or
 // right away once the fighter leaves the shield statuses (a landed parry, jumping out, etc.)
 pub unsafe extern "C" fn parry_window(fighter: &mut L2CFighterCommon) {
@@ -182,6 +221,8 @@ pub unsafe extern "C" fn wall_jump_restore_specials(fighter: &mut L2CFighterComm
     for int in ints {
         WorkModule::set_int(fighter.module_accessor, 0, int);
     }
+    // claude code: plus whatever this fighter's own landing clears (slotted movesets' locks too)
+    function_hooks::lua_bind_hook::restore(fighter.boma());
 }
 
 // claude code: per fighter kind, the game's flags to turn off and counters to zero so its
@@ -292,7 +333,7 @@ pub unsafe extern "C" fn no_special_fall(fighter: &mut L2CFighterCommon) {
         *FIGHTER_STATUS_KIND_DEAD,
         *FIGHTER_STATUS_KIND_REBIRTH
     ]);
-    let is_landed = !fighter.is_situation(*SITUATION_KIND_AIR);
+    let is_landed = !fighter.is_situation(*SITUATION_KIND_AIR) && !modes::faux_air::is_airborne(fighter.boma());
     if is_landed || is_hit_or_dead {
         for flag in special_used_flags() {
             VarModule::off_flag(fighter.battle_object, flag);
@@ -354,12 +395,11 @@ pub unsafe extern "C" fn attack_air_fastfall_hitfall(fighter: &mut L2CFighterCom
     }
 }
 
-// claude code: wall jumps out of the states that come right before special fall, and more. Grant's rule
-// (2026-11-19): any air state, specials included, can wall jump whenever it has no hitbox out (a
-// special's end, like PK Thunder 2's window between its attack and special fall, or an aerial's
-// endlag). it runs the same wall jump test falling does (general_statuses::try_wall_jump: one wall jump per airtime,
+// claude code: wall jumps out of the states that come right before special fall, and more. any air state, specials included,
+// can wall jump whenever it has no hitbox out (a special's end, like PK Thunder 2's window between its attack and special fall,
+// or an aerial's endlag). it runs the same wall jump test falling does (general_statuses::try_wall_jump: one wall jump per airtime,
 // facing either way), and the wall jump itself gives the specials back like any other
-// (wall_jump_restore_specials).
+// (wall_jump_restore_specials). the faux air mode's ground statuses never read as air, so they're left out on their own.
 //
 // which air states: the fighter's own moves only, as an allow-list (wall_jump_anytime_status). the
 // first version allowed every air state but a list of exceptions, and that let a fighter being carried
@@ -420,6 +460,7 @@ pub unsafe extern "C" fn wall_jump_count_reset(fighter: &mut L2CFighterCommon) {
     }
 }
 
+// hdr: based on HDR's sys_line hook (fighters/common/src/opff/mod.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sys_line_system_control_fighter)]
 pub unsafe fn sys_line_system_control_fighter_hook(fighter: &mut L2CFighterCommon) -> L2CValue {
     VarModule::set_int(fighter.battle_object, vars::common::instance::STATUS_REQUESTS_THIS_FRAME, 0);
@@ -428,6 +469,7 @@ pub unsafe fn sys_line_system_control_fighter_hook(fighter: &mut L2CFighterCommo
     right_stick_flick_counter(fighter);
     general_statuses::parry::parry_reward(fighter);
     slide_off_ground_globals(fighter);
+    modes::faux_air::frame(fighter);
     ret
 }
 
@@ -444,6 +486,7 @@ pub fn install() {
     smashline::Agent::new("fighter")
         .on_line(Main, dash_land)
         .on_line(Main, slide_off_air)
+        .on_line(Main, slide_off_own_status)
         .on_line(Main, parry_window)
         .on_line(Main, pass_statuses)
         .on_line(Main, wall_jump_count_reset)
@@ -453,5 +496,6 @@ pub fn install() {
         .on_line(Main, non_tumble_di)
         .on_line(Main, drift_di)
         .on_line(Main, attack_air_fastfall_hitfall)
+        .on_line(Main, modes::aura::fighter_frame)
         .install();
 }

@@ -38,6 +38,7 @@ unsafe fn sub_attack_air_inherit_jump_aerial_motion_uniq_process_exec(fighter: &
     call_original!(fighter)
 }
 
+// hdr: based on HDR's double jump cancel (fighters/common/src/djc.rs)
 unsafe fn dj_cancel(fighter: &mut L2CFighterCommon) {
     fighter.on_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_JUMP_NO_LIMIT_ONCE);
     let speed_x = KineticModule::get_sum_speed_x(fighter.module_accessor, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_ALL);

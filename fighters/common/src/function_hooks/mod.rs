@@ -1,6 +1,7 @@
 use super::*;
 
 pub mod attack;
+pub mod effect;
 pub mod damage;
 pub mod collision;
 pub mod energy;
@@ -10,7 +11,7 @@ pub mod params;
 pub mod lua_bind_hook;
 
 // claude code: air correction, with gravity and a fall speed applied (like HDR's air-continuing dash
-// attacks). used by slid-off moves (lua_bind_hook.rs)
+// attacks). used by slid-off moves (lua_bind_hook.rs) and the faux air mode (modes/faux_air.rs)
 pub unsafe fn air_physics(boma: &mut BattleObjectModuleAccessor, speed_y: f32, fall_speed: f32) {
     GroundModule::correct(boma, GroundCorrectKind(*GROUND_CORRECT_KIND_AIR));
     let air_accel_y = boma.get_param_float("air_accel_y", "");
@@ -22,22 +23,27 @@ pub unsafe fn air_physics(boma: &mut BattleObjectModuleAccessor, speed_y: f32, f
     KineticModule::enable_energy(boma, *FIGHTER_KINETIC_ENERGY_ID_GRAVITY);
 }
 
+// claude code: the FighterManager singleton, null before it exists (is_cpu, modes/aura.rs)
+pub unsafe fn fighter_manager() -> *mut smash::app::FighterManager {
+    static mut MANAGER: usize = 0;
+    if MANAGER == 0 {
+        skyline::nn::ro::LookupSymbol(&mut MANAGER as *mut usize, "_ZN3lib9SingletonIN3app14FighterManagerEE9instance_E\0".as_ptr() as _);
+        if MANAGER == 0 {
+            return std::ptr::null_mut();
+        }
+    }
+    *(MANAGER as *const *mut smash::app::FighterManager)
+}
+
 // claude code: true for a CPU-controlled fighter (amiibo included). CPUs still play by vanilla's
 // rules: their AI asks for things Divergence took out (rolls, spotdodges, pummels), and where Divergence just
 // refuses those, a human lets go of the button but a CPU keeps asking, every frame, and freezes in
 // place. the places that refuse them check this and give CPUs a working stand-in instead
 pub unsafe fn is_cpu(boma: &mut BattleObjectModuleAccessor) -> bool {
-    static mut MANAGER: usize = 0;
     if !boma.is_fighter() {
         return false;
     }
-    if MANAGER == 0 {
-        skyline::nn::ro::LookupSymbol(&mut MANAGER as *mut usize, "_ZN3lib9SingletonIN3app14FighterManagerEE9instance_E\0".as_ptr() as _);
-        if MANAGER == 0 {
-            return false;
-        }
-    }
-    let manager = *(MANAGER as *const *mut smash::app::FighterManager);
+    let manager = fighter_manager();
     if manager.is_null() {
         return false;
     }
@@ -85,11 +91,19 @@ unsafe fn is_enable_transition_term_hook(boma: &mut BattleObjectModuleAccessor, 
     original!()(boma, flag)
 }
 
+// claude code: aura mode, a projectile's size takes its Aura (modes/aura.rs)
+#[skyline::hook(replace = PostureModule::set_scale)]
+unsafe fn set_scale_hook(boma: &mut BattleObjectModuleAccessor, scale: f32, arg3: bool) {
+    let mul = modes::aura::scale_mul(boma);
+    original!()(boma, scale * mul, arg3)
+}
+
 #[skyline::hook(replace=KineticModule::change_kinetic)]
 unsafe fn change_kinetic_hook(boma: &mut BattleObjectModuleAccessor, kinetic_type: i32) -> i32 {
     original!()(boma, kinetic_type)
 }
 
+// hdr: based on HDR's momentum transfer (fighters/common/src/function_hooks/momentum_transfer.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_pre_AttackAir)]
 pub unsafe fn status_pre_AttackAir(fighter: &mut L2CFighterCommon) -> L2CValue {
     fighter.on_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_JUMP_NO_LIMIT_ONCE);
@@ -99,12 +113,14 @@ pub unsafe fn status_pre_AttackAir(fighter: &mut L2CFighterCommon) -> L2CValue {
 #[skyline::hook(replace = StatusModule::situation_kind)]
 unsafe fn situation_kind_replace(boma: &mut smash::app::BattleObjectModuleAccessor) -> i32 {
     // claude code: a slid-off move's scripts still see the ground (lua_bind_hook::is_slide_off_air)
-    if lua_bind_hook::is_slide_off_air(boma) {
+    // claude code: faux air's ground statuses do too (modes/faux_air.rs)
+    if lua_bind_hook::is_slide_off_air(boma) || modes::faux_air::is_faux_ground(boma) {
         return *SITUATION_KIND_GROUND;
     }
     original!()(boma)
 }
 
+// hdr: HDR's version (fighters/common/src/function_hooks/transition.rs)
 #[skyline::hook(replace=WorkModule::enable_transition_term)]
 unsafe fn enable_transition_term_hook(boma: &mut BattleObjectModuleAccessor, flag: i32) -> bool {
     if flag == *FIGHTER_STATUS_TRANSITION_TERM_ID_DASH_TO_RUN {
@@ -123,6 +139,7 @@ fn nro_hook(info: &skyline::nro::NroInfo) {
 
 pub fn install() {
     attack::install();
+    effect::install();
     damage::install();
     collision::install();
     energy::install();
@@ -134,12 +151,14 @@ pub fn install() {
         can_entry_cliff_hook,
         is_enable_transition_term_hook,
         change_kinetic_hook,
+        set_scale_hook,
         situation_kind_replace,
         enable_transition_term_hook
     );
     skyline::nro::add_hook(nro_hook).unwrap();
 
     unsafe {
+        // hdr: HDR's binary patches (fighters/common/src/function_hooks/mod.rs)
         skyline::patching::Patch::in_text(0x6d21a8).data(0x52800015u32);
         skyline::patching::Patch::in_text(0x4ceae8).data(0x140000D1u32);
         skyline::patching::Patch::in_text(0x3fd360).nop();

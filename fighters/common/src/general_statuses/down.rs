@@ -20,6 +20,7 @@ fn nro_hook(info: &skyline::nro::NroInfo) {
     }
 }
 
+// hdr: this and the four hooks after it are HDR's (fighters/common/src/general_statuses/down.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_pre_Down)]
 unsafe fn status_pre_Down(fighter: &mut L2CFighterCommon) -> L2CValue {
     StatusModule::init_settings(

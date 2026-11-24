@@ -1,5 +1,7 @@
 use super::*;
 
+// hdr: HDR's jump hooks (fighters/common/src/function_hooks/jumps.rs): full hop speed worked out from
+// jump_y, and jumps reading the stick live. the jump speed caps are changed (run_speed_max)
 #[skyline::hook(offset = 0x6d2194, inline)]
 unsafe fn fullhop_initial_y_speed_hook(ctx: &mut skyline::hooks::InlineCtx) {
     let callable: extern "C" fn(u64, u64, u64) -> f32 = std::mem::transmute(ctx.registers[8].x());

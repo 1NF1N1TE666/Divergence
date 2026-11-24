@@ -7,6 +7,8 @@ extern "C" {
     static BATTLE_OBJECT_SLOW: *mut smash::app::BattleObjectSlow;
 }
 
+// hdr: the four ECB and landing hooks below are HDR's (fighters/common/src/function_hooks/collision.rs),
+// lightly changed
 #[skyline::hook(offset = 0x45f440)]
 unsafe fn ground_module_ecb_point_calc_hook(ground_module: u64, param_1: *mut *mut Hash40, param_2: *mut f32, param_3: *mut f32, param_4: *mut f32, param_5: *mut f32, param_6: u32) {
     let boma = *((ground_module + 0x20) as *mut *mut BattleObjectModuleAccessor);

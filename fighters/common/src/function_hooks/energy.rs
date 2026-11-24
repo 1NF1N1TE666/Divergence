@@ -4,6 +4,8 @@ use super::*;
 use std::mem::transmute;
 use smash_rs::cpp::simd::{Vector2, Vector3, Vector4};
 
+// hdr: based on HDR's motion energy rewrite (fighters/common/src/function_hooks/energy/motion.rs and
+// energy/mod.rs): the energy layouts, the game functions below and motion_update's flow. condensed here
 #[derive(Copy, Clone)]
 #[repr(C)]
 struct PaddedVec2 { x: f32, y: f32, padding: u64 }
@@ -133,6 +135,10 @@ unsafe fn motion_update(energy: &mut MotionEnergy, boma: &mut BattleObjectModule
     };
     move_speed.x *= lr * energy.speed_mul * energy.speed_mul_2nd.x;
     move_speed.y *= energy.speed_mul * energy.speed_mul_2nd.y;
+    // claude code: aura mode, a move's animation movement times Aura (modes/aura.rs)
+    let aura = modes::aura::mobility_mul(boma);
+    move_speed.x *= aura;
+    move_speed.y *= aura;
 
     if boma.status_frame() == 0 {
         move_speed.x = if is_stop_added { 0.0 } else { energy.prev_speed.x };
@@ -213,6 +219,156 @@ unsafe fn motion_update(energy: &mut MotionEnergy, boma: &mut BattleObjectModule
     energy.set_and_process(PaddedVec2::new(speed.x - from.x, speed.y - from.y), PaddedVec2::new(-1.0, -1.0), speed, boma);
 }
 
+// claude code: aura mode (modes/aura.rs). the speeds a move's own code gives the stop energy (the
+// speed it sets, plus the accel, brake and caps that shape it) are times Aura, so the path stretches
+// and the timing stays the same. the speeds it gives the gravity energy (launches and hops, 2026-11-23,
+// Bandana Dee's up-B missed it) are times the square root of Aura: gravity itself is left alone, so a
+// launch √Aura faster rises exactly Aura times as high. the code reading either speed back gets it
+// divided back down, so code that reads a speed and sets it again (slowing it each frame) doesn't stack
+// the Aura frame on frame. each setter takes the energy id then its values (`count` of them) off the
+// lua stack; the ones in `scaled` get the multiplier. a call that doesn't look like that (another
+// energy, or a value that isn't a number) is left as it is
+struct EnergyArgs<'a> {
+    count: usize,
+    scaled: &'a [usize],
+}
+
+// the multiplier for an energy's speeds (stop: Aura, gravity: √Aura), 1 for the rest
+unsafe fn energy_mul(lua_state: u64, energy_id: i32) -> f32 {
+    let boma = &mut *sv_system::battle_object_module_accessor(lua_state);
+    let aura = modes::aura::mobility_mul(boma);
+    if energy_id == *FIGHTER_KINETIC_ENERGY_ID_STOP {
+        aura
+    } else if energy_id == *FIGHTER_KINETIC_ENERGY_ID_GRAVITY {
+        aura.sqrt()
+    } else {
+        1.0
+    }
+}
+
+unsafe fn scale_energy(lua_state: u64, stop: Option<EnergyArgs>, gravity: Option<EnergyArgs>) {
+    let mut agent = L2CAgent::new(lua_state);
+    let energy_id = agent.pop_lua_stack(1).get_i32();
+    let args = if energy_id == *FIGHTER_KINETIC_ENERGY_ID_STOP {
+        stop
+    } else if energy_id == *FIGHTER_KINETIC_ENERGY_ID_GRAVITY {
+        gravity
+    } else {
+        None
+    };
+    let Some(args) = args else { return };
+    let mul = energy_mul(lua_state, energy_id);
+    if mul == 1.0 {
+        return;
+    }
+    scale_lua_args(lua_state, args.count + 1, args.scaled, mul);
+}
+
+// takes `count` arguments off the lua stack and puts them back, the ones in `scaled` times `mul`.
+// left alone if any of those isn't a number
+unsafe fn scale_lua_args(lua_state: u64, count: usize, scaled: &[usize], mul: f32) {
+    let mut agent = L2CAgent::new(lua_state);
+    let mut params: Vec<L2CValue> = (0..count).map(|i| agent.pop_lua_stack(i as i32 + 1)).collect();
+    if scaled.iter().any(|&i| !matches!(params[i].val_type, L2CValueType::Num | L2CValueType::Int)) {
+        return;
+    }
+    agent.clear_lua_stack();
+    for (i, param) in params.iter_mut().enumerate() {
+        if scaled.contains(&i) {
+            agent.push_lua_stack(&mut L2CValue::new_num(param.get_f32() * mul));
+        } else {
+            agent.push_lua_stack(param);
+        }
+    }
+}
+
+unsafe fn energy_read_mul(lua_state: u64) -> f32 {
+    let energy_id = L2CAgent::new(lua_state).pop_lua_stack(1).get_i32();
+    1.0 / energy_mul(lua_state, energy_id)
+}
+
+const XY: EnergyArgs = EnergyArgs { count: 2, scaled: &[1, 2] };
+
+// stop (id, x, y), gravity (id, y)
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::set_speed)]
+unsafe fn sv_set_speed(lua_state: u64) {
+    scale_energy(lua_state, Some(XY), Some(EnergyArgs { count: 1, scaled: &[1] }));
+    original!()(lua_state);
+}
+
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::add_speed)]
+unsafe fn sv_add_speed(lua_state: u64) {
+    scale_energy(lua_state, Some(XY), None);
+    original!()(lua_state);
+}
+
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::set_accel)]
+unsafe fn sv_set_accel(lua_state: u64) {
+    scale_energy(lua_state, Some(XY), None);
+    original!()(lua_state);
+}
+
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::set_brake)]
+unsafe fn sv_set_brake(lua_state: u64) {
+    scale_energy(lua_state, Some(XY), None);
+    original!()(lua_state);
+}
+
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::set_limit_speed)]
+unsafe fn sv_set_limit_speed(lua_state: u64) {
+    scale_energy(lua_state, Some(XY), None);
+    original!()(lua_state);
+}
+
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::set_stable_speed)]
+unsafe fn sv_set_stable_speed(lua_state: u64) {
+    scale_energy(lua_state, Some(XY), None);
+    original!()(lua_state);
+}
+
+// (id, reset type, x, y, z, ...): stop x and y, gravity y
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::reset_energy)]
+unsafe fn sv_reset_energy(lua_state: u64) {
+    scale_energy(lua_state, Some(EnergyArgs { count: 6, scaled: &[2, 3] }), Some(EnergyArgs { count: 6, scaled: &[3] }));
+    original!()(lua_state);
+}
+
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::get_speed_x)]
+unsafe fn sv_get_speed_x(lua_state: u64) -> f32 {
+    let mul = energy_read_mul(lua_state);
+    original!()(lua_state) * mul
+}
+
+#[skyline::hook(replace = smash::app::sv_kinetic_energy::get_speed_y)]
+unsafe fn sv_get_speed_y(lua_state: u64) -> f32 {
+    let mul = energy_read_mul(lua_state);
+    original!()(lua_state) * mul
+}
+
+// claude code: aura mode, an ACMD script setting a move's speed outright (x, y, attribute) gets it
+// times Aura, like the stop energy above
+#[skyline::hook(replace = smash::app::sv_animcmd::SET_SPEED_EX)]
+unsafe fn set_speed_ex(lua_state: u64) {
+    let boma = &mut *sv_system::battle_object_module_accessor(lua_state);
+    let aura = modes::aura::mobility_mul(boma);
+    if aura != 1.0 {
+        scale_lua_args(lua_state, 3, &[0, 1], aura);
+    }
+    original!()(lua_state);
+}
+
 pub fn install() {
-    skyline::install_hooks!(motion_update);
+    skyline::install_hooks!(
+        motion_update,
+        sv_set_speed,
+        sv_add_speed,
+        sv_set_accel,
+        sv_set_brake,
+        sv_set_limit_speed,
+        sv_set_stable_speed,
+        sv_reset_energy,
+        sv_get_speed_x,
+        sv_get_speed_y,
+        set_speed_ex
+    );
 }

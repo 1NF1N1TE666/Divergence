@@ -1,3 +1,5 @@
+// hdr: HDR's extension traits (dynamic/src/ext.rs): the boma and fighter helpers, command
+// categories and vector helpers the rest of the code calls
 use crate::consts::{globals::*, vars};
 use bitflags::bitflags;
 use modular_bitfield::specifiers::*;

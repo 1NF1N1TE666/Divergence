@@ -5,6 +5,7 @@ use super::*;
 // WALK
 // ============================================================
 
+// hdr: HDR's version (fighters/common/src/general_statuses/walk.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_pre_Walk)]
 unsafe fn status_pre_walk(fighter: &mut L2CFighterCommon) -> L2CValue {
     let ground_brake = fighter.get_param_float("ground_brake", "");
@@ -22,6 +23,7 @@ unsafe fn status_walk_common(fighter: &mut L2CFighterCommon) {
     VarModule::off_flag(fighter.battle_object, vars::common::instance::IS_SMASH_TURN);
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/walk.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_Walk_Main_common)]
 unsafe extern "C" fn status_walk_main_common(fighter: &mut L2CFighterCommon, arg1: L2CValue, arg2: L2CValue, arg3: L2CValue, arg4: L2CValue) -> L2CValue {
     let walk_accel_mul = fighter.get_param_float("walk_accel_mul", "");
@@ -60,6 +62,7 @@ unsafe extern "C" fn status_walk_main_common(fighter: &mut L2CFighterCommon, arg
 // DASH
 // ============================================================
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)
 pub fn wm_param_to_int(boma: *mut app::BattleObjectModuleAccessor, param_cat: u64, param: u64, what: i32) {
     unsafe {
         WorkModule::set_int(boma, WorkModule::get_param_int(boma, param_cat, param), what);
@@ -169,6 +172,7 @@ macro_rules! ok_if {
     }}
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_Dash_Main_common)]
 unsafe extern "C" fn status_dash_main_common(fighter: &mut L2CFighterCommon, arg: L2CValue) -> L2CValue {
     let dash_stick_x: f32 = fighter.get_param_float("common", "dash_stick_x");
@@ -441,6 +445,7 @@ unsafe extern "C" fn status_dash_main_common(fighter: &mut L2CFighterCommon, arg
     ok!()
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)
 #[skyline::hook(replace = L2CFighterCommon_sub_dash_uniq_process_main_internal)]
 unsafe fn sub_dash_uniq_process_main_internal(fighter: &mut L2CFighterCommon, param_1: L2CValue) {
     if !WorkModule::is_enable_transition_term_forbid(fighter.module_accessor, *FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ATTACK_DASH) {
@@ -548,6 +553,7 @@ unsafe fn sub_dash_uniq_process_main_internal(fighter: &mut L2CFighterCommon, pa
     }
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_end_Dash)]
 unsafe fn status_end_dash(fighter: &mut L2CFighterCommon) -> L2CValue {
 	let mut initial_speed = KineticModule::get_sum_speed_x(fighter.module_accessor, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_ALL) - KineticModule::get_sum_speed_x(fighter.module_accessor, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_GROUND) - KineticModule::get_sum_speed_x(fighter.module_accessor, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_EXTERN);
@@ -581,6 +587,7 @@ unsafe fn status_end_dash(fighter: &mut L2CFighterCommon) -> L2CValue {
 
 // FIGHTER_STATUS_KIND_TURN_DASH
 
+// hdr: HDR's version (fighters/common/src/general_statuses/dash.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_pre_TurnDash)]
 unsafe fn status_pre_turndash(fighter: &mut L2CFighterCommon) -> L2CValue {
     VarModule::on_flag(fighter.battle_object, vars::common::instance::IS_SMASH_TURN);
@@ -592,6 +599,7 @@ unsafe fn status_pre_turndash(fighter: &mut L2CFighterCommon) -> L2CValue {
 // RUN
 // ============================================================
 
+// hdr: HDR's version (fighters/common/src/general_statuses/run.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_pre_Run)]
 unsafe fn status_pre_run(fighter: &mut L2CFighterCommon) -> L2CValue {
 	let mut initial_speed = VarModule::get_float(fighter.battle_object, vars::common::instance::CURR_DASH_SPEED);
@@ -630,6 +638,7 @@ unsafe fn status_run_sub(fighter: &mut L2CFighterCommon) {
     fighter.enable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_APPEAL_LW);
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/run.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_Run_Main)]
 unsafe extern "C" fn status_run_main(fighter: &mut L2CFighterCommon) -> L2CValue {
     let run_accel_mul = fighter.get_param_float("run_accel_add", "");
@@ -681,6 +690,7 @@ unsafe extern "C" fn status_run_main(fighter: &mut L2CFighterCommon) -> L2CValue
     ret
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/run.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_RunBrake_Main)]
 unsafe fn status_runbrake_main(fighter: &mut L2CFighterCommon) -> L2CValue {
     if (
@@ -709,6 +719,7 @@ unsafe fn status_runbrake_main(fighter: &mut L2CFighterCommon) -> L2CValue {
 	call_original!(fighter)
 }
 
+// hdr: HDR's version (fighters/common/src/general_statuses/run.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_TurnRunBrake_Main)]
 unsafe fn status_turnrunbrake_main(fighter: &mut L2CFighterCommon) -> L2CValue {
     fighter.enable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_GUARD_ON);
@@ -722,6 +733,7 @@ unsafe fn status_turnrunbrake_main(fighter: &mut L2CFighterCommon) -> L2CValue {
 // TURN
 // ============================================================
 
+// hdr: HDR's version (fighters/common/src/general_statuses/turn.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_pre_TurnCommon)]
 unsafe extern "C" fn status_pre_turncommon(fighter: &mut L2CFighterCommon) {
     WorkModule::enable_transition_term_group(fighter.module_accessor, *FIGHTER_STATUS_TRANSITION_GROUP_CHK_GROUND_SPECIAL);
@@ -747,6 +759,7 @@ unsafe extern "C" fn status_pre_turncommon(fighter: &mut L2CFighterCommon) {
     MotionModule::change_motion(fighter.module_accessor, Hash40::new("turn"), frame, 1.0, false, 0.0, false, false);
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/turn.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_Turn_Main)]
 unsafe extern "C" fn status_turn_main(fighter: &mut L2CFighterCommon) -> L2CValue {
     let should_end = if fighter.global_table[0x35].get_bool() {
@@ -794,6 +807,7 @@ unsafe extern "C" fn status_turn_main(fighter: &mut L2CFighterCommon) -> L2CValu
     L2CValue::I32(1)
 }
 
+// hdr: HDR's version (fighters/common/src/general_statuses/turn.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_end_Turn)]
 unsafe fn status_end_turn(fighter: &mut L2CFighterCommon) -> L2CValue {
     VarModule::off_flag(fighter.battle_object, vars::common::instance::IS_LATE_PIVOT);

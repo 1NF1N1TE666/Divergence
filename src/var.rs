@@ -1,3 +1,5 @@
+// hdr: HDR's VarModule (utils/src/modules/var.rs), the per-object variable storage. unchanged but
+// for the export names (below)
 use smash::app::BattleObject;
 use smash::phx::{Vector2f, Vector3f, Vector4f};
 
@@ -44,6 +46,12 @@ pub struct VarModule {
 
 /// An additional module to be used with Smash's `BattleObject` class. This handles storing and retrieving primitive variables
 /// that you want to associate with a specific object (such as associating a gimmick timer with mario or dk)
+// claude code: every export below carries a Divergence prefix. exported names are global across plugins:
+// Alucard's moveset plugin (richter c120-c127) exports its own HDR-style VarModule under the plain
+// VarModule__* names, loads first, and Divergence's own calls were bound to it. it doesn't know
+// Divergence's storage, so every write was lost and every read came back 0 / false, for every fighter
+// (found 2026-11-23 through the slide-off fall: SLIDE_OFF_AIR never stayed on). same lesson as the
+// get_param hooks in function_hooks/params.rs
 impl VarModule {
     /// Resets all integers that are within the instance array.
     pub const RESET_INSTANCE_INT:   u8 = 0b00000001;
@@ -94,7 +102,7 @@ impl VarModule {
     /// Checks if the object has `VarModule`
     /// # Arguments
     /// * `object` - The owning `BattleObject` instance
-    #[export_name = "VarModule__has_var_module"]
+    #[export_name = "DivergenceVarModule__has_var_module"]
     pub extern "Rust" fn has_var_module(object: *mut BattleObject) -> bool {
         has_var_module!(object)
     }
@@ -103,7 +111,7 @@ impl VarModule {
     /// # Arguments
     /// * `object` - The owning `BattleObject` instance
     /// * `mask` - A mask of the reset values to determine what to reset
-    #[export_name = "VarModule__reset"]
+    #[export_name = "DivergenceVarModule__reset"]
     pub extern "Rust" fn reset(object: *mut BattleObject, mask: u8) {
         let module = require_var_module!(object);
         if mask & Self::RESET_INSTANCE_INT != 0 {
@@ -138,7 +146,7 @@ impl VarModule {
     /// * `what` - The variable to retrieve
     /// # Returns
     /// The variable requested
-    #[export_name = "VarModule__get_int"]
+    #[export_name = "DivergenceVarModule__get_int"]
     pub extern "Rust" fn get_int(object: *mut BattleObject, what: i32) -> i32 {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -152,7 +160,7 @@ impl VarModule {
     /// * `what` - The variable to retrieve
     /// # Returns
     /// The variable requested
-    #[export_name = "VarModule__get_float"]
+    #[export_name = "DivergenceVarModule__get_float"]
     pub extern "Rust" fn get_float(object: *mut BattleObject, what: i32) -> f32 {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -166,7 +174,7 @@ impl VarModule {
     /// * `what` - The variable to retrieve
     /// # Returns
     /// The variable requested
-    #[export_name = "VarModule__get_int64"]
+    #[export_name = "DivergenceVarModule__get_int64"]
     pub extern "Rust" fn get_int64(object: *mut BattleObject, what: i32) -> u64 {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -180,7 +188,7 @@ impl VarModule {
     /// * `what` - The variable to retrieve
     /// # Returns
     /// The variable requested
-    #[export_name = "VarModule__is_flag"]
+    #[export_name = "DivergenceVarModule__is_flag"]
     pub extern "Rust" fn is_flag(object: *mut BattleObject, what: i32) -> bool {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -193,7 +201,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to set
     /// * `val` - The value to set the variable to
-    #[export_name = "VarModule__set_int"]
+    #[export_name = "DivergenceVarModule__set_int"]
     pub extern "Rust" fn set_int(object: *mut BattleObject, what: i32, val: i32) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -206,7 +214,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to set
     /// * `val` - The value to set the variable to
-    #[export_name = "VarModule__set_float"]
+    #[export_name = "DivergenceVarModule__set_float"]
     pub extern "Rust" fn set_float(object: *mut BattleObject, what: i32, val: f32) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -219,7 +227,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to set
     /// * `val` - The value to set the variable to
-    #[export_name = "VarModule__set_int64"]
+    #[export_name = "DivergenceVarModule__set_int64"]
     pub extern "Rust" fn set_int64(object: *mut BattleObject, what: i32, val: u64) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -232,7 +240,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to set
     /// * `val` - The value to set the variable to
-    #[export_name = "VarModule__set_flag"]
+    #[export_name = "DivergenceVarModule__set_flag"]
     pub extern "Rust" fn set_flag(object: *mut BattleObject, what: i32, val: bool) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -246,7 +254,7 @@ impl VarModule {
     /// * `what` - The variable to set
     /// # Note
     /// This method is equivalent to `VarModule::set_flag(object, what, false)`
-    #[export_name = "VarModule__off_flag"]
+    #[export_name = "DivergenceVarModule__off_flag"]
     pub extern "Rust" fn off_flag(object: *mut BattleObject, what: i32) {
         Self::set_flag(object, what, false);
     }
@@ -257,7 +265,7 @@ impl VarModule {
     /// * `what` - The variable to set
     /// # Note
     /// This method is equivalent to `VarModule::set_flag(object, what, true)`
-    #[export_name = "VarModule__on_flag"]
+    #[export_name = "DivergenceVarModule__on_flag"]
     pub extern "Rust" fn on_flag(object: *mut BattleObject, what: i32) {
         Self::set_flag(object, what, true);
     }
@@ -270,7 +278,7 @@ impl VarModule {
     /// # Returns
     /// * `true` - `what` was less than `min` before or after decrementing
     /// * `false` - `what` remains greater than or equal to `min` after decrementing
-    #[export_name = "VarModule__countdown_int"]
+    #[export_name = "DivergenceVarModule__countdown_int"]
     pub extern "Rust" fn countdown_int(object: *mut BattleObject, what: i32, min: i32) -> bool {
         if Self::get_int(object, what) > min {
             Self::dec_int(object, what);
@@ -285,7 +293,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to add to
     /// * `amount` - The value to add to the variable
-    #[export_name = "VarModule__add_int"]
+    #[export_name = "DivergenceVarModule__add_int"]
     pub extern "Rust" fn add_int(object: *mut BattleObject, what: i32, amount: i32) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -298,7 +306,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to subtract from
     /// * `amount` - The value to subtract from the variable
-    #[export_name = "VarModule__sub_int"]
+    #[export_name = "DivergenceVarModule__sub_int"]
     pub extern "Rust" fn sub_int(object: *mut BattleObject, what: i32, amount: i32) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -312,7 +320,7 @@ impl VarModule {
     /// * `what` - The variable to increment
     /// # Note
     /// This is functionally equivalent to `VarModule::add_int(object, what, 1)`
-    #[export_name = "VarModule__inc_int"]
+    #[export_name = "DivergenceVarModule__inc_int"]
     pub extern "Rust" fn inc_int(object: *mut BattleObject, what: i32) {
         Self::add_int(object, what, 1);
     }
@@ -323,7 +331,7 @@ impl VarModule {
     /// * `what` - The variable to decrement
     /// # Note
     /// This is functionally equivalent to `VarModule::sub_int(object, what, 1)`
-    #[export_name = "VarModule__dec_int"]
+    #[export_name = "DivergenceVarModule__dec_int"]
     pub extern "Rust" fn dec_int(object: *mut BattleObject, what: i32) {
         Self::sub_int(object, what, 1);
     }
@@ -333,7 +341,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to add on to
     /// * `amount` - The amount to add to the variable
-    #[export_name = "VarModule__add_float"]
+    #[export_name = "DivergenceVarModule__add_float"]
     pub extern "Rust" fn add_float(object: *mut BattleObject, what: i32, amount: f32) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -346,7 +354,7 @@ impl VarModule {
     /// * `object` - The owning `BattleObject` instance
     /// * `what` - The variable to subtract from
     /// * `amount` - The amount to subtract from the variable
-    #[export_name = "VarModule__sub_float"]
+    #[export_name = "DivergenceVarModule__sub_float"]
     pub extern "Rust" fn sub_float(object: *mut BattleObject, what: i32, amount: f32) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -361,7 +369,7 @@ impl VarModule {
     /// * `val` - The vector to set
     /// # Panics
     /// This function requires that the last 3 bytes of `what` are less than `0xFFF`
-    #[export_name = "VarModule__set_vec2"]
+    #[export_name = "DivergenceVarModule__set_vec2"]
     pub extern "Rust" fn set_vec2(object: *mut BattleObject, what: i32, val: Vector2f) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -380,7 +388,7 @@ impl VarModule {
     /// * `val` - The vector to set
     /// # Panics
     /// This function requires that the last 3 bytes of `what` are less than `0xFFE`
-    #[export_name = "VarModule__set_vec3"]
+    #[export_name = "DivergenceVarModule__set_vec3"]
     pub extern "Rust" fn set_vec3(object: *mut BattleObject, what: i32, val: Vector3f) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -400,7 +408,7 @@ impl VarModule {
     /// * `val` - The vector to set
     /// # Panics
     /// This function requires that the last 3 bytes of `what` are less than `0xFFD`
-    #[export_name = "VarModule__set_vec4"]
+    #[export_name = "DivergenceVarModule__set_vec4"]
     pub extern "Rust" fn set_vec4(object: *mut BattleObject, what: i32, val: Vector4f) {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -422,7 +430,7 @@ impl VarModule {
     /// The 2-dimensional vector starting at the value specified
     /// # Panics
     /// This function requires that the last 3 bytes of `what` are less than `0xFFF`
-    #[export_name = "VarModule__get_vec2"]
+    #[export_name = "DivergenceVarModule__get_vec2"]
     pub extern "Rust" fn get_vec2(object: *mut BattleObject, what: i32) -> Vector2f {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -444,7 +452,7 @@ impl VarModule {
     /// The 3-dimensional vector starting at the value specified
     /// # Panics
     /// This function requires that the last 3 bytes of `what` are less than `0xFFE`
-    #[export_name = "VarModule__get_vec3"]
+    #[export_name = "DivergenceVarModule__get_vec3"]
     pub extern "Rust" fn get_vec3(object: *mut BattleObject, what: i32) -> Vector3f {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;
@@ -467,7 +475,7 @@ impl VarModule {
     /// The 4-dimensional vector starting at the value specified
     /// # Panics
     /// This function requires that the last 3 bytes of `what` are less than `0xFFD`
-    #[export_name = "VarModule__get_vec4"]
+    #[export_name = "DivergenceVarModule__get_vec4"]
     pub extern "Rust" fn get_vec4(object: *mut BattleObject, what: i32) -> Vector4f {
         let module = require_var_module!(object);
         let vec_index = ((what >> 0xC) & 0x1) as usize;

@@ -2,6 +2,7 @@ use super::*;
 
 pub fn install() {
     skyline::nro::add_hook(nro_hook);
+    // hdr: HDR's patch (fighters/common/src/general_statuses/damage.rs)
     skyline::patching::Patch::in_text(0x63251c).nop();
 }
 
@@ -18,6 +19,7 @@ fn nro_hook(info: &skyline::nro::NroInfo) {
     }
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/damage.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_FighterStatusUniqProcessDamage_leave_stop)]
 pub unsafe fn FighterStatusUniqProcessDamage_leave_stop_hook(fighter: &mut L2CFighterCommon, arg2: L2CValue, arg3: L2CValue) -> L2CValue {
     let status_kind = fighter.status();
@@ -126,6 +128,7 @@ pub unsafe fn FighterStatusUniqProcessDamage_leave_stop_hook(fighter: &mut L2CFi
     0.into()
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/damage.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_DamageFly_Main)]
 unsafe fn status_DamageFly_Main_hook(fighter: &mut L2CFighterCommon) -> L2CValue {
     if !fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_FINISH_CAMERA_TARGET) {
@@ -158,6 +161,7 @@ unsafe fn status_DamageFly_Main_hook(fighter: &mut L2CFighterCommon) -> L2CValue
     0.into()
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/damage.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_exec_damage_elec_hit_stop)]
 pub unsafe fn exec_damage_elec_hit_stop_hook(fighter: &mut L2CFighterCommon) {
     let status_kind = fighter.status();
@@ -231,6 +235,7 @@ pub unsafe fn exec_damage_elec_hit_stop_hook(fighter: &mut L2CFighterCommon) {
     }
 }
 
+// hdr: HDR's version (fighters/common/src/general_statuses/mod.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_virtual_ftStatusUniqProcessDamage_exec_common)]
 pub unsafe fn virtual_ftStatusUniqProcessDamage_exec_common(fighter: &mut L2CFighterCommon) {
     if [*FIGHTER_STATUS_KIND_DAMAGE,
@@ -245,6 +250,7 @@ pub unsafe fn virtual_ftStatusUniqProcessDamage_exec_common(fighter: &mut L2CFig
     }
 }
 
+// hdr: HDR's version (fighters/common/src/general_statuses/mod.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_FighterStatusDamage__correctDamageVectorEffect)]
 pub unsafe fn FighterStatusDamage__correctDamageVectorEffect(fighter: &mut L2CFighterCommon, param_1: L2CValue) -> L2CValue {
     if fighter.global_table[STATUS_KIND_INTERRUPT] != FIGHTER_STATUS_KIND_DAMAGE_AIR {

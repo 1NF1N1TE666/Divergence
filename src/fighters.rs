@@ -1,3 +1,5 @@
+// hdr: one module per fighter behind a feature of its name, each with HDR's acmd / opff / status
+// layout (fighters/<name>/src)
 #[path = "../fighters/common/src/lib.rs"]
 mod common;
 #[cfg(feature = "bayonetta")]

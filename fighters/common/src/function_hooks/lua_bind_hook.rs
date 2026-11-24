@@ -1,4 +1,6 @@
 use super::*;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Mutex;
 
 unsafe fn is_edge_slip_status(boma: &mut BattleObjectModuleAccessor) -> bool {
     boma.is_fighter() && boma.is_situation(*SITUATION_KIND_GROUND) && boma.is_status_one_of(&[
@@ -33,10 +35,29 @@ unsafe fn is_edge_slip_status(boma: &mut BattleObjectModuleAccessor) -> bool {
 // claude code: slippery ground moves. the "stop at the edge" ground corrections become plain ground
 // correction, so every grounded move can slide off edges
 unsafe fn slide_off_correct_kind(kind: i32) -> i32 {
-    if kind == *GROUND_CORRECT_KIND_GROUND_CLIFF_STOP || kind == *GROUND_CORRECT_KIND_GROUND_CLIFF_STOP_ATTACK {
+    if is_edge_stop_kind(kind) {
         *GROUND_CORRECT_KIND_GROUND
     } else {
         kind
+    }
+}
+
+unsafe fn is_edge_stop_kind(kind: i32) -> bool {
+    kind == *GROUND_CORRECT_KIND_GROUND_CLIFF_STOP || kind == *GROUND_CORRECT_KIND_GROUND_CLIFF_STOP_ATTACK
+}
+
+// claude code: remembers, per status, that it asked to stop at edges (so it can slide off), and forgets
+// it when the status switches to air correction itself (a move that really takes off). see
+// opff.rs slide_off_own_status, which gives such a status air physics once it's off the edge
+unsafe fn note_edge_stop(boma: &mut BattleObjectModuleAccessor, kind: i32) {
+    if !boma.is_fighter() || !VarModule::has_var_module(boma.object()) {
+        return;
+    }
+    if is_edge_stop_kind(kind) {
+        VarModule::on_flag(boma.object(), vars::common::status::EDGE_STOP_SLIPPED);
+    } else if kind == *GROUND_CORRECT_KIND_AIR
+    && !VarModule::is_flag(boma.object(), vars::common::status::SLID_OFF_OWN_STATUS) {
+        VarModule::off_flag(boma.object(), vars::common::status::EDGE_STOP_SLIPPED);
     }
 }
 
@@ -183,10 +204,14 @@ unsafe fn slide_off_request(boma: &mut BattleObjectModuleAccessor, status_kind: 
 
 #[skyline::hook(replace=GroundModule::correct)]
 unsafe fn correct_hook(boma: &mut BattleObjectModuleAccessor, kind: GroundCorrectKind) -> u64 {
+    if modes::faux_air::is_airborne(boma) {
+        return original!()(boma, GroundCorrectKind(*GROUND_CORRECT_KIND_AIR));
+    }
     if is_edge_slip_status(boma) {
         return original!()(boma, GroundCorrectKind(*GROUND_CORRECT_KIND_GROUND));
     }
     if boma.is_fighter() {
+        note_edge_stop(boma, kind.0);
         return original!()(boma, GroundCorrectKind(slide_off_correct_kind(kind.0)));
     }
     original!()(boma, kind)
@@ -196,7 +221,11 @@ unsafe fn correct_hook(boma: &mut BattleObjectModuleAccessor, kind: GroundCorrec
 // slippery correction as GroundModule::correct
 #[skyline::hook(replace=GroundModule::set_correct)]
 unsafe fn set_correct_hook(boma: &mut BattleObjectModuleAccessor, kind: GroundCorrectKind) {
+    if modes::faux_air::is_airborne(boma) {
+        return original!()(boma, GroundCorrectKind(*GROUND_CORRECT_KIND_AIR));
+    }
     if boma.is_fighter() {
+        note_edge_stop(boma, kind.0);
         return original!()(boma, GroundCorrectKind(slide_off_correct_kind(kind.0)));
     }
     original!()(boma, kind)
@@ -204,6 +233,7 @@ unsafe fn set_correct_hook(boma: &mut BattleObjectModuleAccessor, kind: GroundCo
 
 #[skyline::hook(replace=StatusModule::init_settings)]
 unsafe fn init_settings_hook(boma: &mut BattleObjectModuleAccessor, mut situation: smash::app::SituationKind, mut kinetic_type: i32, mut ground_correct_kind: u32, ground_cliff_check_kind: smash::app::GroundCliffCheckKind, jostle: bool, keep_flag: i32, keep_int: i32, keep_float: i32, arg10: i32) -> u64 {
+    let asked_correct = ground_correct_kind as i32;
     if is_edge_slip_status(boma)
     || (boma.is_fighter() && boma.is_situation(*SITUATION_KIND_GROUND) && boma.is_status(*FIGHTER_STATUS_KIND_TURN)) {
         ground_correct_kind = *GROUND_CORRECT_KIND_GROUND as u32;
@@ -214,6 +244,9 @@ unsafe fn init_settings_hook(boma: &mut BattleObjectModuleAccessor, mut situatio
         situation = smash::app::SituationKind(*SITUATION_KIND_NONE);
         ground_correct_kind = *GROUND_CORRECT_KIND_AIR as u32;
     }
+
+    // claude code: faux air's ground statuses stay in the air (modes/faux_air.rs)
+    modes::faux_air::init_settings(boma, &mut situation, &mut ground_correct_kind);
 
     if boma.is_fighter() {
         if boma.is_prev_situation(*SITUATION_KIND_AIR)
@@ -238,8 +271,11 @@ unsafe fn init_settings_hook(boma: &mut BattleObjectModuleAccessor, mut situatio
         }
         VarModule::reset(boma.object(), mask);
     }
+    note_edge_stop(boma, asked_correct);
 
-    original!()(boma, situation, kinetic_type, ground_correct_kind, ground_cliff_check_kind, jostle, keep_flag, keep_int, keep_float, arg10)
+    let ret = original!()(boma, situation, kinetic_type, ground_correct_kind, ground_cliff_check_kind, jostle, keep_flag, keep_int, keep_float, arg10);
+    modes::faux_air::keep_falling(boma);
+    ret
 }
 
 #[skyline::hook(replace=StatusModule::change_status_request_from_script)]
@@ -258,6 +294,7 @@ unsafe fn change_status_request_from_script_hook(boma: &mut BattleObjectModuleAc
             }
         }
     }
+    let clear_buffer = clear_buffer && !modes::faux_air::keeps_buffer(boma, status_kind);
     // claude code: universal no special fall (FALL_SPECIAL -> FALL, locked specials blocked)
     let status_kind = match filter_status_request(boma, status_kind) {
         Some(kind) => kind,
@@ -359,7 +396,9 @@ pub unsafe fn lock_last_special(boma: &mut BattleObjectModuleAccessor) {
 // slid-off moves are handled first; each generic special that starts is remembered in
 // LAST_SPECIAL_KIND (and IN_SPECIAL), locked specials are refused, and FALL_SPECIAL becomes FALL
 pub unsafe fn filter_status_request(boma: &mut BattleObjectModuleAccessor, status_kind: i32) -> Option<i32> {
-    filter_common_request(boma, status_kind)
+    // claude code: faux air's jumps, platform drops and falls go last (modes/faux_air.rs)
+    let status_kind = filter_common_request(boma, status_kind)?;
+    modes::faux_air::request(boma, status_kind)
 }
 
 unsafe fn filter_common_request(boma: &mut BattleObjectModuleAccessor, status_kind: i32) -> Option<i32> {
@@ -423,9 +462,76 @@ pub unsafe fn is_special_term_locked(boma: &mut BattleObjectModuleAccessor, term
 // claude code: non-script status requests get the same filter as change_status_request_from_script
 #[skyline::hook(replace = StatusModule::change_status_request)]
 unsafe fn change_status_request_hook(boma: &mut BattleObjectModuleAccessor, status_kind: i32, clear_buffer: bool) -> u64 {
+    let clear_buffer = clear_buffer && !modes::faux_air::keeps_buffer(boma, status_kind);
     match filter_status_request(boma, status_kind) {
         Some(kind) => original!()(boma, kind, clear_buffer),
         None => 0
+    }
+}
+
+// claude code: walljump refresh for moves we have no list for (slotted movesets, mostly). a move that
+// locks itself after one aerial use (and doesn't use special fall) turns a flag on or a counter up, and
+// its own code clears it when the fighter lands. so: watch what a fighter clears on its landing frame
+// (instance flags turned off, counters set to 0) and replay exactly that on a wall jump
+// (opff.rs, wall_jump_restore_specials). learned per fighter kind + costume, since two movesets on one
+// fighter (Armstrong, Springtrap...) give the same ID different meanings. only fighter-specific IDs
+// count: the common ones (jump count and friends) stay out, so wall jumps don't give back jumps
+
+// first fighter-specific instance IDs (FIGHTER_INSTANCE_WORK_ID_FLAG_TERM / _INT_TERM)
+const FIGHTER_FLAG_FIRST: i32 = 0x200000E0;
+const FIGHTER_FLAG_END: i32 = 0x20000400;
+const FIGHTER_INT_FIRST: i32 = 0x100000BD;
+const FIGHTER_INT_END: i32 = 0x10000400;
+
+#[derive(Default)]
+struct Learned {
+    flags: BTreeSet<i32>,
+    ints: BTreeSet<i32>,
+}
+
+static LEARNED: Mutex<BTreeMap<(i32, i32), Learned>> = Mutex::new(BTreeMap::new());
+
+unsafe fn key(boma: &mut BattleObjectModuleAccessor) -> (i32, i32) {
+    (boma.kind(), WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR))
+}
+
+// the frame a fighter really lands (not a slid-off move or faux air pretending to be grounded)
+unsafe fn is_landing_frame(boma: &mut BattleObjectModuleAccessor) -> bool {
+    boma.is_fighter()
+    && StatusModule::is_situation_changed(boma)
+    && StatusModule::prev_situation_kind(boma) == *SITUATION_KIND_AIR
+    && StatusModule::situation_kind(boma) == *SITUATION_KIND_GROUND
+    && !is_slide_off_air(boma)
+    && !modes::faux_air::is_faux_ground(boma)
+}
+
+#[skyline::hook(replace = WorkModule::off_flag)]
+unsafe fn divergence_air_locks_off_flag(boma: &mut BattleObjectModuleAccessor, flag: i32) {
+    if (FIGHTER_FLAG_FIRST..FIGHTER_FLAG_END).contains(&flag) && is_landing_frame(boma) {
+        LEARNED.lock().unwrap().entry(key(boma)).or_default().flags.insert(flag);
+    }
+    original!()(boma, flag)
+}
+
+#[skyline::hook(replace = WorkModule::set_int)]
+unsafe fn divergence_air_locks_set_int(boma: &mut BattleObjectModuleAccessor, value: i32, int: i32) {
+    if value == 0 && (FIGHTER_INT_FIRST..FIGHTER_INT_END).contains(&int) && is_landing_frame(boma) {
+        LEARNED.lock().unwrap().entry(key(boma)).or_default().ints.insert(int);
+    }
+    original!()(boma, value, int)
+}
+
+// claude code: called on a wall jump's first frame. clears what this fighter's landing clears
+pub unsafe fn restore(boma: &mut BattleObjectModuleAccessor) {
+    let (flags, ints): (Vec<i32>, Vec<i32>) = match LEARNED.lock().unwrap().get(&key(boma)) {
+        Some(l) => (l.flags.iter().copied().collect(), l.ints.iter().copied().collect()),
+        None => return,
+    };
+    for flag in flags {
+        WorkModule::off_flag(boma, flag);
+    }
+    for int in ints {
+        WorkModule::set_int(boma, 0, int);
     }
 }
 
@@ -435,6 +541,8 @@ pub fn install() {
         set_correct_hook,
         init_settings_hook,
         change_status_request_from_script_hook,
-        change_status_request_hook
+        change_status_request_hook,
+        divergence_air_locks_off_flag,
+        divergence_air_locks_set_int
     );
 }

@@ -22,9 +22,11 @@ pub mod offsets;
 pub mod consts;
 pub mod ext;
 pub mod movesets;
+pub mod config;
 pub use offsets::*;
 mod fighters;
 
+// hdr: the plugin entry, hot-reload hook and panic popup are HDR's (src/lib.rs, utils/src/lib.rs)
 #[unsafe(no_mangle)]
 pub fn smashline_install() {
     fighters::install();

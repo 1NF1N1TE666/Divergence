@@ -22,6 +22,7 @@ fn nro_hook(info: &skyline::nro::NroInfo) {
     }
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/mod.rs)
 #[skyline::hook(replace = L2CFighterCommon_sub_transition_group_check_air_wall_jump)]
 unsafe fn sub_transition_group_check_air_wall_jump(fighter: &mut L2CFighterCommon) -> L2CValue {
     if fighter.global_table[0x31].get_bool() {
@@ -82,6 +83,7 @@ pub unsafe fn status_Landing_MainSub(fighter: &mut L2CFighterCommon) -> L2CValue
     call_original!(fighter)
 }
 
+// hdr: HDR's version (fighters/common/src/general_statuses/mod.rs)
 #[skyline::hook(replace = L2CFighterCommon_sub_transition_group_check_ground)]
 unsafe fn sub_transition_group_check_ground(fighter: &mut L2CFighterCommon, to_squat_wait: L2CValue) -> L2CValue {
     if fighter.global_table[SITUATION_KIND].get_i32() == *SITUATION_KIND_GROUND {
@@ -156,6 +158,7 @@ unsafe fn sub_transition_group_check_ground(fighter: &mut L2CFighterCommon, to_s
     false.into()
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/mod.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_FallSub)]
 pub unsafe fn status_FallSub_hook(fighter: &mut L2CFighterCommon, arg2: L2CValue) {
     call_original!(fighter, arg2);
@@ -167,6 +170,7 @@ pub unsafe fn status_FallSub_hook(fighter: &mut L2CFighterCommon, arg2: L2CValue
     }
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/mod.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_end_pass_ground)]
 pub unsafe fn end_pass_ground(fighter: &mut L2CFighterCommon) -> L2CValue {
     if fighter.global_table[PREV_STATUS_KIND] != FIGHTER_STATUS_KIND_DASH
@@ -179,6 +183,7 @@ pub unsafe fn end_pass_ground(fighter: &mut L2CFighterCommon) -> L2CValue {
     call_original!(fighter)
 }
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/mod.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_is_dive)]
 pub unsafe fn sub_is_dive(fighter: &mut L2CFighterCommon) -> L2CValue {
     if fighter.is_flag(*FIGHTER_STATUS_WORK_ID_FLAG_RESERVE_DIVE) {

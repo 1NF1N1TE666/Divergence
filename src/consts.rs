@@ -1,3 +1,4 @@
+// hdr: HDR's L2CFighterCommon global table indexes (dynamic/src/consts.rs)
 pub mod globals {
     // 0x1
     pub const FIGHTER_KIND: i32 = 0x2;
@@ -60,6 +61,8 @@ pub mod globals {
     pub const DASH_POST_TRANSITION_CALLBACK: i32 = 0x57;
 }
 
+// hdr: VarModule IDs, laid out the way HDR lays out theirs (instance / status, flags / ints /
+// floats). the ones without a claude code note are HDR's own
 pub mod vars {
     pub mod common {
         pub mod instance {
@@ -79,6 +82,16 @@ pub mod vars {
             pub const SLIDE_OFF_AIR: i32 = 0x0015; // claude code: a ground move slid off and keeps going in the air
             pub const PARRY_SHIELD_HELD: i32 = 0x0016; // claude code: shield still held since a parry, so no startup parry yet
             pub const SLIDE_OFF_THROWN: i32 = 0x0017; // claude code: being thrown by a fighter who slid off an edge
+            // claude code: faux air mode (fighters/common/src/modes/faux_air.rs)
+            pub const FAUX_AIR_GROUND_STATUS: i32 = 0x0020; // in a ground status, which always sees the ground
+            pub const FAUX_AIR_AIRBORNE: i32 = 0x0021; // a ground status is off the ground, faux gravity on
+            pub const FAUX_AIR_DIVE: i32 = 0x0022; // faux fast-fall
+            pub const FAUX_AIR_REAL_SITUATION: i32 = 0x0023; // StatusModule::situation_kind tells the truth while on
+            pub const FAUX_AIR_PASSING: i32 = 0x0025; // dropping through a platform, no landing until clear of it
+            pub const FAUX_AIR_FROM_HITSTUN: i32 = 0x0026; // a ground status just took over in the air out of hitstun
+            // claude code: aura mode (fighters/common/src/modes/aura.rs)
+            pub const AURA_WEAPON_SCALED: i32 = 0x0030; // a weapon's size has had its Aura applied
+            pub const AURA_IN_MOVE: i32 = 0x0031; // the current status is an attack or special, or follows on from one
 
             // ints
             pub const LEFT_STICK_FLICK_X: i32 = 0x0003;
@@ -90,12 +103,20 @@ pub mod vars {
             pub const DJC_KINETIC: i32 = 0x0009; // claude code: kinetic a DJC'd non-aerial goes back to when its jump ends
             pub const DJC_FRAMES_LEFT: i32 = 0x000A; // claude code: frames left of a DJC'd non-aerial's double jump
             pub const STATUS_REQUESTS_THIS_FRAME: i32 = 0x000B; // claude code: status requests so far this frame (crash guard, lua_bind_hook.rs)
+            pub const AURA_EFFECT_L: i32 = 0x0010; // claude code: aura mode's left hand effect handle, 0 = none
+            pub const AURA_EFFECT_R: i32 = 0x0011; // claude code: aura mode's right hand effect handle, 0 = none
 
             // floats
             pub const ECB_BOTTOM_Y_OFFSET: i32 = 0x0006;
             pub const CURR_DASH_SPEED: i32 = 0x0007;
             pub const ECB_CENTER_Y_OFFSET: i32 = 0x0008;
             pub const SLIDE_OFF_SPEED_Y: i32 = 0x0009; // claude code: fall speed of a slid-off move, kept across its statuses
+            pub const FAUX_AIR_SPEED_Y: i32 = 0x0020; // claude code: faux vertical speed, kept across status changes
+            // claude code: aura mode (fighters/common/src/modes/aura.rs)
+            pub const AURA_POWER: i32 = 0x0030; // a fighter's Aura multiplier, or a weapon's (taken from its owner when it spawns), 0 = not worked out yet
+            pub const AURA_STOCK_MUL: i32 = 0x0031; // Stock Aura multiplier now (eases toward the target)
+            pub const AURA_STOCK_TARGET: i32 = 0x0032; // Stock Aura multiplier the current stock standings call for
+            pub const AURA_STOCK_STEP: i32 = 0x0033; // how far the Stock Aura multiplier moves per frame toward the target
 
         }
         pub mod status {
@@ -105,6 +126,9 @@ pub mod vars {
             pub const IS_AFTER_DASH_TO_RUN_FRAME: i32 = 0x1003;
             pub const CHECK_HOLD_INPUT: i32 = 0x1011;
             pub const FORCE_OPPONENT_KNOCKDOWN: i32 = 0x1012; // claude code: fighters this status hits get FORCE_KNOCKDOWN
+            pub const EDGE_STOP_SLIPPED: i32 = 0x1013; // claude code: this status asked to stop at edges and got plain ground correction instead
+            pub const SLID_OFF_OWN_STATUS: i32 = 0x1014; // claude code: it slid off and runs on in the air under slide-off physics (opff.rs)
+            pub const AURA_STATUS_ATTACKED: i32 = 0x1015; // claude code: this fighter-specific status has had a hitbox out, so it's a move (modes/aura.rs)
 
             // ints
 

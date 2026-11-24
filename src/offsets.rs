@@ -1,3 +1,6 @@
+// hdr: HDR's object module system (utils/src/modules.rs). every fighter, weapon and item vtable is
+// copied with room for extra entries and tagged with HDR's magic number, and VarModule lives in one
+// of those entries. the fixed vtable lengths are Divergence's (below)
 #[path = "var.rs"]
 mod var;
 
