@@ -37,7 +37,7 @@ use crate::{
 use smashline::*;
 
 pub fn install() {
-    let agent = &mut movesets::agent("szerosuit");
+    let agent = &mut config::agent("szerosuit");
     acmd::install(agent);
     opff::install(agent);
     status::install(agent);

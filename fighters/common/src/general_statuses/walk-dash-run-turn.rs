@@ -1,6 +1,39 @@
 // status imports
 use super::*;
 
+// hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)
+pub fn wm_param_to_int(boma: *mut app::BattleObjectModuleAccessor, param_cat: u64, param: u64, what: i32) {
+    unsafe {
+        WorkModule::set_int(boma, WorkModule::get_param_int(boma, param_cat, param), what);
+    }
+}
+
+macro_rules! interrupt {
+    () => { return L2CValue::I32(1) };
+    ($fighter:ident, $status:expr, $repeat:expr) => {{ $fighter.change_status($status.into(), $repeat.into()); interrupt!(); }}
+}
+
+macro_rules! interrupt_if {
+    ($e:expr) => {{
+        if $e { interrupt!() }
+    }};
+    ($fighter:ident, $status:expr, $repeat:expr, $e:expr) => {{
+        if $e {
+            interrupt!($fighter, $status, $repeat);
+        }
+    }}
+}
+
+macro_rules! ok {
+    () => { return L2CValue::I32(0) };
+}
+
+macro_rules! ok_if {
+    ($e:expr) => {{
+        if $e { ok!() }
+    }}
+}
+
 // ============================================================
 // WALK
 // ============================================================
@@ -61,13 +94,6 @@ unsafe extern "C" fn status_walk_main_common(fighter: &mut L2CFighterCommon, arg
 // ============================================================
 // DASH
 // ============================================================
-
-// hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)
-pub fn wm_param_to_int(boma: *mut app::BattleObjectModuleAccessor, param_cat: u64, param: u64, what: i32) {
-    unsafe {
-        WorkModule::set_int(boma, WorkModule::get_param_int(boma, param_cat, param), what);
-    }
-}
 
 #[skyline::hook(replace = L2CFighterCommon_status_DashCommon)]
 unsafe fn status_DashCommon(fighter: &mut L2CFighterCommon) {
@@ -144,32 +170,6 @@ unsafe fn status_DashCommon(fighter: &mut L2CFighterCommon) {
         }
     }
     VarModule::off_flag(fighter.battle_object, vars::common::instance::IS_SMASH_TURN);
-}
-
-macro_rules! interrupt {
-    () => { return L2CValue::I32(1) };
-    ($fighter:ident, $status:expr, $repeat:expr) => {{ $fighter.change_status($status.into(), $repeat.into()); interrupt!(); }}
-}
-
-macro_rules! interrupt_if {
-    ($e:expr) => {{
-        if $e { interrupt!() }
-    }};
-    ($fighter:ident, $status:expr, $repeat:expr, $e:expr) => {{
-        if $e {
-            interrupt!($fighter, $status, $repeat);
-        }
-    }}
-}
-
-macro_rules! ok {
-    () => { return L2CValue::I32(0) };
-}
-
-macro_rules! ok_if {
-    ($e:expr) => {{
-        if $e { ok!() }
-    }}
 }
 
 // hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)

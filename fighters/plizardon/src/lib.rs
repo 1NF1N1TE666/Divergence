@@ -37,7 +37,7 @@ use crate::{
 use smashline::*;
 
 pub fn install() {
-    let agent = &mut movesets::agent("plizardon");
+    let agent = &mut config::agent("plizardon");
     acmd::install(agent);
     opff::install(agent);
     status::install(agent);

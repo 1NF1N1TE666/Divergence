@@ -50,20 +50,6 @@ unsafe fn hitstun_fall_speed_3(ctx: &mut skyline::hooks::InlineCtx) {
     ctx.registers_f[0].set_s(air_speed_y_stable)
 }
 
-// hdr: this and attack_module_set_power_hook_pattern are HDR's (fighters/common/src/function_hooks/attack.rs)
-#[skyline::hook(offset = 0x46b648, inline)]
-unsafe fn get_hitstop_mul(ctx: &mut skyline::hooks::InlineCtx) {
-    if ctx.registers[1].w() == 0x2 {
-        let hitstop_mul: f32 = 1.0;
-        ctx.registers_f[0].set_s(hitstop_mul)
-    }
-}
-
-#[skyline::hook(offset = 0x3dd688, inline)]
-unsafe extern "C" fn attack_module_set_power_hook_pattern(ctx: &mut skyline::hooks::InlineCtx) {
-    ctx.registers_f[2].set_s(1.0);
-}
-
 pub fn install() {
     unsafe {
         skyline::patching::Patch::in_text(0x6d2498).nop();
@@ -87,8 +73,6 @@ pub fn install() {
         hitstun_gravity_2,
         hitstun_fall_speed_2,
         hitstun_gravity_3,
-        hitstun_fall_speed_3,
-        get_hitstop_mul,
-        attack_module_set_power_hook_pattern
+        hitstun_fall_speed_3
     );
 }

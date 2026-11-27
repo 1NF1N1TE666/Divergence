@@ -1,4 +1,3 @@
-**/romfs
 **/target
 **/Cargo.lock
 **/cpp.rs

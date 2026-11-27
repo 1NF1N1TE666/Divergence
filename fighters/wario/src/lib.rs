@@ -37,7 +37,7 @@ use crate::{
 use smashline::*;
 
 pub fn install() {
-    let agent = &mut movesets::agent("wario");
+    let agent = &mut config::agent("wario");
     acmd::install(agent);
     opff::install(agent);
     status::install(agent);

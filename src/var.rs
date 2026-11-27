@@ -51,7 +51,7 @@ pub struct VarModule {
 // VarModule__* names, loads first, and Divergence's own calls were bound to it. it doesn't know
 // Divergence's storage, so every write was lost and every read came back 0 / false, for every fighter
 // (found 2026-11-23 through the slide-off fall: SLIDE_OFF_AIR never stayed on). same lesson as the
-// get_param hooks in function_hooks/params.rs
+// get_param hooks in function_hooks/get_param.rs
 impl VarModule {
     /// Resets all integers that are within the instance array.
     pub const RESET_INSTANCE_INT:   u8 = 0b00000001;

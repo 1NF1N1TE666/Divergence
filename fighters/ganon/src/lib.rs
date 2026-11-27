@@ -35,9 +35,22 @@ use crate::{
     consts::*,
 };
 use smashline::*;
+use config::{Custom, Special};
+
+const CUSTOMS: &[Custom] = &[
+    Custom { name: "Warlock Blade", special: Special::Neutral, number: 2, statuses: Some(status::special_n::blade) },
+    Custom { name: "Warlock Thrust", special: Special::Neutral, number: 3, statuses: None },
+    Custom { name: "Flame Wave", special: Special::Side, number: 2, statuses: None },
+    Custom { name: "Flame Chain", special: Special::Side, number: 3, statuses: None },
+    Custom { name: "Dark Fists", special: Special::Up, number: 2, statuses: None },
+    Custom { name: "Dark Vault", special: Special::Up, number: 3, statuses: None },
+    Custom { name: "Wizard's Dropkick", special: Special::Down, number: 2, statuses: None },
+    Custom { name: "Wizard's Assault", special: Special::Down, number: 3, statuses: None },
+];
 
 pub fn install() {
-    let agent = &mut movesets::agent("ganon");
+    config::register_customs(*FIGHTER_KIND_GANON, "ganon", CUSTOMS);
+    let agent = &mut config::agent("ganon");
     acmd::install(agent);
     opff::install(agent);
     status::install(agent);

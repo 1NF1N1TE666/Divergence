@@ -37,7 +37,7 @@ use crate::{
 use smashline::*;
 
 pub fn install() {
-    let agent = &mut movesets::agent("koopa");
+    let agent = &mut config::agent("koopa");
     acmd::install(agent);
     opff::install(agent);
     status::install(agent);

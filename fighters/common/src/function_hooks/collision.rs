@@ -123,27 +123,8 @@ unsafe fn groundcollision__processgroundcollisioninfo_check_landing_sub(groundco
     call_original!(groundcollision, arg2, prev_ecb_bottom_pos, ecb_bottom_translation, arg5, arg6, arg7)
 }
 
-// claude code: every hit on a fighter is logged here (FighterManager::notify_log_event_collision_hit,
-// whose lua_bind wrapper jumps to this function). an attacking fighter whose status has
-// FORCE_OPPONENT_KNOCKDOWN on gives the fighter it hit FORCE_KNOCKDOWN (no floor bounce, no tech)
-#[skyline::hook(offset = 0x67a7b0)]
-unsafe fn notify_log_event_collision_hit(fighter_manager: u64, attacker_id: u32, defender_id: u32, power: f32, collision_kind: i32, flag: bool) -> u64 {
-    if sv_battle_object::is_active(attacker_id)
-    && sv_battle_object::is_active(defender_id) {
-        let attacker = sv_battle_object::module_accessor(attacker_id);
-        let defender = sv_battle_object::module_accessor(defender_id);
-        if (*attacker).is_fighter()
-        && (*defender).is_fighter()
-        && VarModule::is_flag((*attacker).object(), vars::common::status::FORCE_OPPONENT_KNOCKDOWN) {
-            VarModule::on_flag((*defender).object(), vars::common::instance::FORCE_KNOCKDOWN);
-        }
-    }
-    call_original!(fighter_manager, attacker_id, defender_id, power, collision_kind, flag)
-}
-
 pub fn install() {
     skyline::install_hooks!(
-        notify_log_event_collision_hit,
         groundcollision__processgroundcollisioninfo_check_landing,
         groundcollision__processgroundcollisioninfo_check_landing_sub,
         ground_module_ecb_point_calc_hook,

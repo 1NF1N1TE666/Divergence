@@ -37,7 +37,7 @@ use crate::{
 use smashline::*;
 
 pub fn install() {
-    let agent = &mut movesets::agent("elight");
+    let agent = &mut config::agent("elight");
     acmd::install(agent);
     opff::install(agent);
     status::install(agent);

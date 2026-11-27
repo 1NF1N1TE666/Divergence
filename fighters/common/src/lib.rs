@@ -22,13 +22,13 @@ use smashline::*;
 pub mod opff;
 pub mod general_statuses;
 pub mod function_hooks;
-pub mod misc;
-pub mod variants;
+pub mod divergent_variants;
 pub mod modes;
 
 pub fn install() {
     opff::install();
     general_statuses::install();
     function_hooks::install();
+    divergent_variants::install();
     modes::install();
 }

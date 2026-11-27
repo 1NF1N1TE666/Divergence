@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<struct>
+  <list hash="param_special_n">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <int hash="critical_frame">40</int>
+      <int hash="critical_slow_rate">2</int>
+      <float hash="critical_zoom_rate">4.5</float>
+      <int hash="critical_zoom_in_frame">3</int>
+      <float hash="critical_camera_offset_x">0</float>
+      <float hash="critical_camera_offset_y">0</float>
+      <int hash="critical_1_on_1">1</int>
+      <int hash="critical_bg_only_frame">30</int>
+      <float hash="accel">2.818</float>
+      <float hash="angle">35</float>
+      <float hash="stick_y_min">0.25</float>
+      <float hash="stick_y_max">0.65</float>
+      <float hash="red_coef">0.92</float>
+    </struct>
+    <struct index="2">
+      <int hash="critical_frame">40</int>
+      <int hash="critical_slow_rate">2</int>
+      <float hash="critical_zoom_rate">4.5</float>
+      <int hash="critical_zoom_in_frame">3</int>
+      <float hash="critical_camera_offset_x">0</float>
+      <float hash="critical_camera_offset_y">0</float>
+      <int hash="critical_1_on_1">1</int>
+      <int hash="critical_bg_only_frame">30</int>
+      <float hash="accel">0.591</float>
+      <float hash="angle">35</float>
+      <float hash="stick_y_min">0.25</float>
+      <float hash="stick_y_max">0.65</float>
+      <float hash="red_coef">0.92</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+  <list hash="param_special_s">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <float hash="red_coef">0.18</float>
+      <float hash="speed_coef">0.6</float>
+      <float hash="landing_frame">22</float>
+      <float hash="landing_frame_2">40</float>
+    </struct>
+    <struct index="2">
+      <float hash="red_coef">0.18</float>
+      <float hash="speed_coef">1</float>
+      <float hash="landing_frame">22</float>
+      <float hash="landing_frame_2">40</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+  <list hash="param_special_hi">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <float hash="speed_coef">1.2</float>
+      <int hash="landing_frame">24</int>
+      <float hash="lr_stick_x">0.25</float>
+      <float hash="speed_x_mul_ground">1.1</float>
+      <float hash="speed_x_mul">6</float>
+      <float hash="speed_max_x_mul">0.95</float>
+      <float hash="accel_y">0.103</float>
+      <float hash="fall_x_mul">0.7</float>
+    </struct>
+    <struct index="2">
+      <float hash="speed_coef">0.8</float>
+      <int hash="landing_frame">24</int>
+      <float hash="lr_stick_x">0.25</float>
+      <float hash="speed_x_mul_ground">0</float>
+      <float hash="speed_x_mul">0</float>
+      <float hash="speed_max_x_mul">0.95</float>
+      <float hash="accel_y">0.103</float>
+      <float hash="fall_x_mul">0.7</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+  <list hash="param_special_lw">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <float hash="hit_reduct_coef">0.95</float>
+      <int hash="hit_reduct_count">4</int>
+      <float hash="end_ground_to_ground_rate">1.053</float>
+      <float hash="end_air_to_ground_rate">0.842</float>
+      <float hash="end_ground_to_ground_brake">0.12</float>
+    </struct>
+    <struct index="2">
+      <float hash="hit_reduct_coef">1</float>
+      <int hash="hit_reduct_count">0</int>
+      <float hash="end_ground_to_ground_rate">1.053</float>
+      <float hash="end_air_to_ground_rate">0.842</float>
+      <float hash="end_ground_to_ground_brake">0.12</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+</struct>

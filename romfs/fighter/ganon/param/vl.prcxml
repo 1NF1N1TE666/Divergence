@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<struct>
+  <list hash="param_special_n">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <int hash="critical_frame">40</int>
+      <int hash="critical_slow_rate">4</int>
+      <float hash="critical_zoom_rate">4</float>
+      <int hash="critical_zoom_in_frame">3</int>
+      <float hash="critical_camera_offset_x">0</float>
+      <float hash="critical_camera_offset_y">0</float>
+      <int hash="critical_1_on_1">1</int>
+      <int hash="critical_bg_only_frame">30</int>
+      <float hash="ganon_punch_angle">45</float>
+      <float hash="ganon_punch_accel">0.8</float>
+      <float hash="0x1a2355de81">0.5</float>
+    </struct>
+    <struct index="2">
+      <int hash="critical_frame">40</int>
+      <int hash="critical_slow_rate">4</int>
+      <float hash="critical_zoom_rate">4</float>
+      <int hash="critical_zoom_in_frame">3</int>
+      <float hash="critical_camera_offset_x">0</float>
+      <float hash="critical_camera_offset_y">0</float>
+      <int hash="critical_1_on_1">1</int>
+      <int hash="critical_bg_only_frame">30</int>
+      <float hash="ganon_punch_angle">45</float>
+      <float hash="ganon_punch_accel">0.8</float>
+      <float hash="0x1a2355de81">0.5</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+  <list hash="param_special_s">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <float hash="0x1f2e14a2b6">1</float>
+      <float hash="explosion_faile_y_accel">0.05</float>
+      <float hash="explosion_faile_y_max">1.65</float>
+      <float hash="explosion_catch_y_accel">0.1</float>
+      <float hash="explosion_catch_y_max">0.8</float>
+      <float hash="explosion_fall_y_accel">0.6</float>
+      <float hash="explosion_fall_y_max">4</float>
+      <float hash="explosion_landing_frame_faile">20</float>
+      <float hash="special_s_fall_check_dead_offset_y">-18</float>
+      <float hash="explosion_speed_coef">0.95</float>
+    </struct>
+    <struct index="2">
+      <float hash="0x1f2e14a2b6">1</float>
+      <float hash="explosion_faile_y_accel">0.05</float>
+      <float hash="explosion_faile_y_max">1.65</float>
+      <float hash="explosion_catch_y_accel">0.1</float>
+      <float hash="explosion_catch_y_max">1</float>
+      <float hash="explosion_fall_y_accel">1</float>
+      <float hash="explosion_fall_y_max">5</float>
+      <float hash="explosion_landing_frame_faile">20</float>
+      <float hash="special_s_fall_check_dead_offset_y">-18</float>
+      <float hash="explosion_speed_coef">1</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+  <list hash="param_special_hi">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <float hash="special_hi_speed_max_x_mul">0.6</float>
+      <float hash="special_hi_accel_y">0.33</float>
+      <float hash="special_hi_fall_x_mul">1</float>
+      <float hash="special_hi_landing_frame">26</float>
+      <float hash="special_hi_lr_stick_x">0.25</float>
+      <float hash="special_hi_speed_x_mul">0.05</float>
+      <float hash="special_hi_catch_speed">0.1</float>
+      <float hash="special_hi_catched_frame">8</float>
+      <float hash="special_hi_speed_coef">1</float>
+    </struct>
+    <struct index="2">
+      <float hash="special_hi_speed_max_x_mul">0</float>
+      <float hash="special_hi_accel_y">0.33</float>
+      <float hash="special_hi_fall_x_mul">0.72</float>
+      <float hash="special_hi_landing_frame">36</float>
+      <float hash="special_hi_lr_stick_x">0.25</float>
+      <float hash="special_hi_speed_x_mul">0</float>
+      <float hash="special_hi_catch_speed">0.1</float>
+      <float hash="special_hi_catched_frame">8</float>
+      <float hash="special_hi_speed_coef">1</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+  <list hash="param_special_lw">
+    <hash40 index="0">dummy</hash40>
+    <struct index="1">
+      <float hash="ganon_kick_hit_reduct_coef">1</float>
+      <int hash="ganon_kick_hit_reduct_count">4</int>
+      <float hash="0x1c6a5104ff">1.724</float>
+      <float hash="0x207b183de1">1</float>
+      <float hash="0x24e417e3a1">0.7</float>
+      <float hash="ganon_kick_speed_coeff">1</float>
+    </struct>
+    <struct index="2">
+      <float hash="ganon_kick_hit_reduct_coef">0.95</float>
+      <int hash="ganon_kick_hit_reduct_count">4</int>
+      <float hash="0x1c6a5104ff">1</float>
+      <float hash="0x207b183de1">0.85</float>
+      <float hash="0x24e417e3a1">0.5</float>
+      <float hash="ganon_kick_speed_coeff">1</float>
+    </struct>
+    <hash40 index="3">dummy</hash40>
+  </list>
+</struct>

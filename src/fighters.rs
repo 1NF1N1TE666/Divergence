@@ -1,7 +1,7 @@
 // hdr: one module per fighter behind a feature of its name, each with HDR's acmd / opff / status
 // layout (fighters/<name>/src)
 #[path = "../fighters/common/src/lib.rs"]
-mod common;
+pub mod common;
 #[cfg(feature = "bayonetta")]
 #[path = "../fighters/bayonetta/src/lib.rs"]
 mod bayonetta;
@@ -277,8 +277,9 @@ macro_rules! install_fighters {
 }
 
 pub fn install() {
-    crate::movesets::scan();
+    crate::config::scan_movesets();
     common::install();
+    crate::config::install_customs();
 
     install_fighters! {
         install;
@@ -371,4 +372,6 @@ pub fn install() {
         younglink = "younglink",
         zelda = "zelda"
     }
+
+    crate::config::report_customs();
 }

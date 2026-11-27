@@ -21,8 +21,23 @@ extern crate smash;
 pub mod offsets;
 pub mod consts;
 pub mod ext;
-pub mod movesets;
 pub mod config;
+
+// claude code: a log line Ryujinx shows (svc 0x27, OutputDebugString, the way Dionysus logs) as well as
+// skyline's TCP logger. skyline's println! alone only goes over TCP, so Ryujinx never saw it
+pub fn log(message: &str) {
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        core::arch::asm!(
+            "svc 0x27",
+            inout("x0") message.as_ptr() => _,
+            inout("x1") message.len() => _,
+            clobber_abi("C"),
+            options(nostack),
+        );
+    }
+    skyline::logging::log(message);
+}
 pub use offsets::*;
 mod fighters;
 

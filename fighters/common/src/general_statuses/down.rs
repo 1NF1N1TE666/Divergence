@@ -1,25 +1,5 @@
 use super::*;
 
-pub fn install() {
-    skyline::nro::add_hook(nro_hook);
-}
-
-fn nro_hook(info: &skyline::nro::NroInfo) {
-    if info.name == "common" {
-        skyline::install_hooks!(
-            sub_DamageFlyChkUniq,
-            status_pre_Down,
-            status_DownStand_Main,
-            status_DownStandFb_Main,
-            status_DownStandAttack_Main,
-            status_pre_DownDamage,
-            status_pre_TreadFall,
-            sub_TreadFallPassive,
-            status_end_TreadFall
-        );
-    }
-}
-
 // hdr: this and the four hooks after it are HDR's (fighters/common/src/general_statuses/down.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_pre_Down)]
 unsafe fn status_pre_Down(fighter: &mut L2CFighterCommon) -> L2CValue {
@@ -128,34 +108,18 @@ unsafe fn status_DownStandAttack_Main(fighter: &mut L2CFighterCommon) -> L2CValu
     call_original!(fighter)
 }
 
-// claude code: no jab locks. a hit on a fighter lying on the ground never becomes the lying hit
-// (DOWN_DAMAGE, which keeps them down for follow-up locks and a forced getup); it becomes a normal
-// standing hit reaction instead, so the hit's own knockback decides what happens
-#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_pre_DownDamage)]
-unsafe fn status_pre_DownDamage(fighter: &mut L2CFighterCommon) -> L2CValue {
-    fighter.boma().set_status_kind_interrupt(*FIGHTER_STATUS_KIND_DAMAGE);
-    1.into()
-}
-
-// claude code: an aerial footstool forces a knockdown: falling from it sets FORCE_KNOCKDOWN
-#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_pre_TreadFall)]
-unsafe fn status_pre_TreadFall(fighter: &mut L2CFighterCommon) -> L2CValue {
-    VarModule::on_flag(fighter.battle_object, vars::common::instance::FORCE_KNOCKDOWN);
-    call_original!(fighter)
-}
-
-// claude code: no tech while FORCE_KNOCKDOWN is set, so landing from an aerial footstool is a knockdown
-#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_TreadFallPassive)]
-unsafe fn sub_TreadFallPassive(fighter: &mut L2CFighterCommon) -> L2CValue {
-    if VarModule::is_flag(fighter.battle_object, vars::common::instance::FORCE_KNOCKDOWN) {
-        return false.into();
+fn nro_hook(info: &skyline::nro::NroInfo) {
+    if info.name == "common" {
+        skyline::install_hooks!(
+            sub_DamageFlyChkUniq,
+            status_pre_Down,
+            status_DownStand_Main,
+            status_DownStandFb_Main,
+            status_DownStandAttack_Main
+        );
     }
-    call_original!(fighter)
 }
 
-// claude code: the footstool fall is over, so FORCE_KNOCKDOWN is cleared
-#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_end_TreadFall)]
-unsafe fn status_end_TreadFall(fighter: &mut L2CFighterCommon) -> L2CValue {
-    VarModule::off_flag(fighter.battle_object, vars::common::instance::FORCE_KNOCKDOWN);
-    call_original!(fighter)
+pub fn install() {
+    skyline::nro::add_hook(nro_hook);
 }

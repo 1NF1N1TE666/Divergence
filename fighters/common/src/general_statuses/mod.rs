@@ -3,40 +3,65 @@ use globals::*;
 
 #[path = "walk-dash-run-turn.rs"]
 mod walk_dash_run_turn;
-mod attack_4;
-mod damage;
+mod attackx4;
+pub mod damage;
 pub mod djc;
 mod down;
-pub mod parry;
+mod downdamage;
+pub mod lasso;
+pub mod shield;
+pub mod walljump;
 
-fn nro_hook(info: &skyline::nro::NroInfo) {
-    if info.name == "common" {
-        skyline::install_hooks!(
-            status_Landing_MainSub,
-            sub_transition_group_check_ground,
-            status_FallSub_hook,
-            end_pass_ground,
-            sub_is_dive,
-            sub_transition_group_check_air_wall_jump
-        );
+// claude code: held SDI, shared by hitstun (damage.rs) and shield (shield.rs). no mashing: holding the
+// stick past common `hit_stop_delay_stick` nudges the fighter once every `hit_stop_delay_flick_frame`
+// frames of hitlag, up to `hit_stop_delay_flick_max_count` nudges per hitlag. each nudge is the stick
+// times `hit_stop_delay_flick_mul` times `mul` (the hit's own SDI multiplier, and the shield's
+// `hit_stop_delay_guard_mul` on a shield). Some((x, y)) = nudge this frame. the counters reset whenever
+// the fighter isn't in hitlag (sdi_reset)
+pub unsafe fn held_sdi(fighter: &mut L2CFighterCommon, mul: f32) -> Option<(f32, f32)> {
+    let wait = VarModule::get_int(fighter.battle_object, vars::common::instance::SDI_WAIT);
+    if wait > 0 {
+        VarModule::dec_int(fighter.battle_object, vars::common::instance::SDI_WAIT);
+        return None;
     }
+    let count = VarModule::get_int(fighter.battle_object, vars::common::instance::SDI_COUNT);
+    if count >= fighter.get_param_int("common", "hit_stop_delay_flick_max_count") {
+        return None;
+    }
+    let stick_x = fighter.left_stick_x();
+    let stick_y = fighter.left_stick_y();
+    if (stick_x * stick_x + stick_y * stick_y).sqrt() < fighter.get_param_float("common", "hit_stop_delay_stick") {
+        return None;
+    }
+    VarModule::inc_int(fighter.battle_object, vars::common::instance::SDI_COUNT);
+    let interval = fighter.get_param_int("common", "hit_stop_delay_flick_frame");
+    VarModule::set_int(fighter.battle_object, vars::common::instance::SDI_WAIT, (interval - 1).max(0));
+    let strength = fighter.get_param_float("common", "hit_stop_delay_flick_mul") * mul;
+    Some((stick_x * strength, stick_y * strength))
 }
 
-// hdr: based on HDR's version (fighters/common/src/general_statuses/mod.rs)
-#[skyline::hook(replace = L2CFighterCommon_sub_transition_group_check_air_wall_jump)]
-unsafe fn sub_transition_group_check_air_wall_jump(fighter: &mut L2CFighterCommon) -> L2CValue {
-    if fighter.global_table[0x31].get_bool() {
-        let callable: extern "C" fn(&mut L2CFighterCommon) -> L2CValue = std::mem::transmute(fighter.global_table[0x31].get_ptr());
-        if callable(fighter).get_bool() {
-            return true.into();
-        }
+// claude code: moves the fighter by an SDI nudge. a grounded fighter isn't pushed down into the floor
+pub unsafe fn apply_sdi(fighter: &mut L2CFighterCommon, x: f32, y: f32) {
+    let y = if fighter.is_situation(*SITUATION_KIND_GROUND) { y.max(0.0) } else { y };
+    let mut pos = *PostureModule::pos(fighter.module_accessor);
+    pos.x += x;
+    pos.y += y;
+    PostureModule::set_pos(fighter.module_accessor, &pos);
+}
+
+// claude code: held SDI's counters start over with each hitlag or bounce freeze. runs every frame from
+// sys_line_system_control_fighter (opff.rs)
+pub unsafe fn sdi_reset(fighter: &mut L2CFighterCommon) {
+    if !StopModule::is_stop(fighter.module_accessor)
+    && !damage::is_bounce_freeze(fighter) {
+        VarModule::set_int(fighter.battle_object, vars::common::instance::SDI_COUNT, 0);
+        VarModule::set_int(fighter.battle_object, vars::common::instance::SDI_WAIT, 0);
     }
-    try_wall_jump(fighter).into()
 }
 
 // claude code: the wall jump test itself, without the fighter's own callback (global 0x31) the hook
-// above runs first. that callback belongs to the statuses that set it up; wall_jump_anytime
-// (opff.rs) calls this from any air state, and on 2026-11-19 a CPU Kazuya crashed the game there with
+// below runs first. that callback belongs to the statuses that set it up; wall_jump_anytime
+// (walljump.rs) calls this from any air state, and on 2026-11-19 a CPU Kazuya crashed the game there with
 // a stack overflow, the callback looping back into the wall jump check. true = wall jumping now
 pub unsafe fn try_wall_jump(fighter: &mut L2CFighterCommon) -> bool {
     if fighter.global_table[SITUATION_KIND].get_i32() != *SITUATION_KIND_AIR
@@ -72,6 +97,18 @@ pub unsafe fn try_wall_jump(fighter: &mut L2CFighterCommon) -> bool {
     }
 
     return false;
+}
+
+// hdr: based on HDR's version (fighters/common/src/general_statuses/mod.rs)
+#[skyline::hook(replace = L2CFighterCommon_sub_transition_group_check_air_wall_jump)]
+unsafe fn sub_transition_group_check_air_wall_jump(fighter: &mut L2CFighterCommon) -> L2CValue {
+    if fighter.global_table[0x31].get_bool() {
+        let callable: extern "C" fn(&mut L2CFighterCommon) -> L2CValue = std::mem::transmute(fighter.global_table[0x31].get_ptr());
+        if callable(fighter).get_bool() {
+            return true.into();
+        }
+    }
+    try_wall_jump(fighter).into()
 }
 
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_Landing_MainSub)]
@@ -250,13 +287,29 @@ pub unsafe fn sub_is_dive(fighter: &mut L2CFighterCommon) -> L2CValue {
     true.into()
 }
 
+fn nro_hook(info: &skyline::nro::NroInfo) {
+    if info.name == "common" {
+        skyline::install_hooks!(
+            status_Landing_MainSub,
+            sub_transition_group_check_ground,
+            status_FallSub_hook,
+            end_pass_ground,
+            sub_is_dive,
+            sub_transition_group_check_air_wall_jump
+        );
+    }
+}
+
 pub fn install() {
     walk_dash_run_turn::install();
-    attack_4::install();
+    attackx4::install();
     damage::install();
     djc::install();
     down::install();
-    parry::install();
+    downdamage::install();
+    lasso::install();
+    shield::install();
+    walljump::install();
 
     skyline::nro::add_hook(nro_hook);
 }

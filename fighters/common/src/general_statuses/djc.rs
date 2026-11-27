@@ -1,43 +1,5 @@
 use super::*;
 
-#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_attack_air_inherit_jump_aerial_motion_uniq_process_init)]
-unsafe fn sub_attack_air_inherit_jump_aerial_motion_uniq_process_init(fighter: &mut L2CFighterCommon) -> L2CValue {
-    if fighter.global_table[FIGHTER_KIND] == FIGHTER_KIND_DEMON {
-        return call_original!(fighter);
-    }
-    let motion_kind = MotionModule::motion_kind(fighter.module_accessor);
-    let frame = fighter.motion_frame();
-
-    fighter.sub_attack_air_kind();
-    if (motion_kind == hash40("jump_aerial_f") || motion_kind == hash40("jump_aerial_b"))
-    && !fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_IGNORE_2ND_MOTION) {
-        MotionModule::add_motion_2nd(fighter.module_accessor, Hash40::new_raw(motion_kind), frame, 1.0, false, 1.0);
-        MotionModule::set_weight(fighter.module_accessor, 1.0, true);
-        if ControlModule::check_button_on(fighter.module_accessor, *CONTROL_PAD_BUTTON_JUMP) || frame < 2.0 {
-            KineticModule::change_kinetic(fighter.module_accessor, *FIGHTER_KINETIC_TYPE_JUMP_AERIAL_MOTION_2ND);
-        } else {
-            dj_cancel(fighter);
-        }
-    } else {
-        fighter.on_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_JUMP_NO_LIMIT_ONCE);
-        KineticModule::change_kinetic(fighter.module_accessor, *FIGHTER_KINETIC_TYPE_MOTION_FALL);
-    }
-    let _ = fighter.sub_attack_air_uniq_process_init();
-    0.into()
-}
-
-#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_attack_air_inherit_jump_aerial_motion_uniq_process_exec)]
-unsafe fn sub_attack_air_inherit_jump_aerial_motion_uniq_process_exec(fighter: &mut L2CFighterCommon) -> L2CValue {
-    if KineticModule::get_kinetic_type(fighter.module_accessor) == *FIGHTER_KINETIC_TYPE_JUMP_AERIAL_MOTION_2ND
-    && fighter.global_table[FIGHTER_KIND] != FIGHTER_KIND_DEMON
-    && MotionModule::frame_2nd(fighter.module_accessor) >= 2.0
-    && fighter.global_table[CURRENT_FRAME].get_i32() <= 6
-    && ControlModule::check_button_off(fighter.module_accessor, *CONTROL_PAD_BUTTON_JUMP) {
-        dj_cancel(fighter);
-    }
-    call_original!(fighter)
-}
-
 // hdr: based on HDR's double jump cancel (fighters/common/src/djc.rs)
 unsafe fn dj_cancel(fighter: &mut L2CFighterCommon) {
     fighter.on_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_JUMP_NO_LIMIT_ONCE);
@@ -48,7 +10,6 @@ unsafe fn dj_cancel(fighter: &mut L2CFighterCommon) {
     sv_kinetic_energy!(set_speed, fighter, FIGHTER_KINETIC_ENERGY_ID_CONTROL, speed_x, 0.0);
     sv_kinetic_energy!(set_speed, fighter, FIGHTER_KINETIC_ENERGY_ID_GRAVITY, speed_y.clamp(-2.5, 2.5));
 }
-
 
 // claude code: DJC for statuses other than aerials (Zair, specials). djc_inherit_pre goes in the
 // status's Pre, while the double jump's motion is still playing, and keeps that motion going as a
@@ -170,6 +131,44 @@ unsafe extern "C" fn attack_air_exit_inherit(fighter: &mut L2CFighterCommon) -> 
 unsafe extern "C" fn attack_air_pre_demon(fighter: &mut L2CFighterCommon) -> L2CValue {
     fighter.on_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_JUMP_NO_LIMIT_ONCE);
     smashline::original_status(Pre, fighter, *FIGHTER_STATUS_KIND_ATTACK_AIR)(fighter)
+}
+
+#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_attack_air_inherit_jump_aerial_motion_uniq_process_init)]
+unsafe fn sub_attack_air_inherit_jump_aerial_motion_uniq_process_init(fighter: &mut L2CFighterCommon) -> L2CValue {
+    if fighter.global_table[FIGHTER_KIND] == FIGHTER_KIND_DEMON {
+        return call_original!(fighter);
+    }
+    let motion_kind = MotionModule::motion_kind(fighter.module_accessor);
+    let frame = fighter.motion_frame();
+
+    fighter.sub_attack_air_kind();
+    if (motion_kind == hash40("jump_aerial_f") || motion_kind == hash40("jump_aerial_b"))
+    && !fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_IGNORE_2ND_MOTION) {
+        MotionModule::add_motion_2nd(fighter.module_accessor, Hash40::new_raw(motion_kind), frame, 1.0, false, 1.0);
+        MotionModule::set_weight(fighter.module_accessor, 1.0, true);
+        if ControlModule::check_button_on(fighter.module_accessor, *CONTROL_PAD_BUTTON_JUMP) || frame < 2.0 {
+            KineticModule::change_kinetic(fighter.module_accessor, *FIGHTER_KINETIC_TYPE_JUMP_AERIAL_MOTION_2ND);
+        } else {
+            dj_cancel(fighter);
+        }
+    } else {
+        fighter.on_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_JUMP_NO_LIMIT_ONCE);
+        KineticModule::change_kinetic(fighter.module_accessor, *FIGHTER_KINETIC_TYPE_MOTION_FALL);
+    }
+    let _ = fighter.sub_attack_air_uniq_process_init();
+    0.into()
+}
+
+#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_attack_air_inherit_jump_aerial_motion_uniq_process_exec)]
+unsafe fn sub_attack_air_inherit_jump_aerial_motion_uniq_process_exec(fighter: &mut L2CFighterCommon) -> L2CValue {
+    if KineticModule::get_kinetic_type(fighter.module_accessor) == *FIGHTER_KINETIC_TYPE_JUMP_AERIAL_MOTION_2ND
+    && fighter.global_table[FIGHTER_KIND] != FIGHTER_KIND_DEMON
+    && MotionModule::frame_2nd(fighter.module_accessor) >= 2.0
+    && fighter.global_table[CURRENT_FRAME].get_i32() <= 6
+    && ControlModule::check_button_off(fighter.module_accessor, *CONTROL_PAD_BUTTON_JUMP) {
+        dj_cancel(fighter);
+    }
+    call_original!(fighter)
 }
 
 fn nro_hook(info: &skyline::nro::NroInfo) {

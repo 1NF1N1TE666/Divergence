@@ -1,0 +1,52 @@
+{
+    "new-dir-files": {
+        "fighter/ganon/c00": [
+            "fighter/ganon/motion/body/c00/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c00/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c00/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c00/d00specialairn2turn.nuanmb"
+        ],
+        "fighter/ganon/c01": [
+            "fighter/ganon/motion/body/c01/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c01/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c01/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c01/d00specialairn2turn.nuanmb"
+        ],
+        "fighter/ganon/c02": [
+            "fighter/ganon/motion/body/c02/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c02/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c02/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c02/d00specialairn2turn.nuanmb"
+        ],
+        "fighter/ganon/c03": [
+            "fighter/ganon/motion/body/c03/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c03/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c03/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c03/d00specialairn2turn.nuanmb"
+        ],
+        "fighter/ganon/c04": [
+            "fighter/ganon/motion/body/c04/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c04/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c04/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c04/d00specialairn2turn.nuanmb"
+        ],
+        "fighter/ganon/c05": [
+            "fighter/ganon/motion/body/c05/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c05/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c05/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c05/d00specialairn2turn.nuanmb"
+        ],
+        "fighter/ganon/c06": [
+            "fighter/ganon/motion/body/c06/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c06/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c06/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c06/d00specialairn2turn.nuanmb"
+        ],
+        "fighter/ganon/c07": [
+            "fighter/ganon/motion/body/c07/d00specialn2.nuanmb",
+            "fighter/ganon/motion/body/c07/d00specialn2turn.nuanmb",
+            "fighter/ganon/motion/body/c07/d00specialairn2.nuanmb",
+            "fighter/ganon/motion/body/c07/d00specialairn2turn.nuanmb"
+        ]
+    }
+}

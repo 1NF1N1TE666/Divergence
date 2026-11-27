@@ -517,6 +517,7 @@ pub trait BomaExt {
     unsafe fn get_player_idx_from_boma(&mut self) -> i32;
     unsafe fn set_command_input_button(&mut self, command: usize, buttons: u8);
     unsafe fn clone_command_input(&mut self, command: usize, replace_command: usize);
+    unsafe fn rate_curve(&mut self, agent: &mut L2CAgentBase, rates: &[f32], until: f32);
 }
 
 impl BomaExt for BattleObjectModuleAccessor {
@@ -1231,6 +1232,25 @@ impl BomaExt for BattleObjectModuleAccessor {
         let original = *control_module.add((0x7f0 + (command * 8)) / 8) as *mut CommandInputState;
         let replace = *control_module.add((0x7f0 + (replace_command * 8)) / 8) as *mut CommandInputState;
         *replace = *original.clone();
+    }
+
+    // claude code: plays an ACMD script's animation on a per-frame rate curve instead of a
+    // few flat FT_MOTION_RATE steps. rates[f] is how many real frames anim frame f lasts
+    // (same meaning as FT_MOTION_RATE), so slow-downs can sit on frames where the pose holds
+    // still and fast swings keep close to normal speed. Call it between a script's events:
+    // it walks the curve up to anim frame `until`, setting each frame's rate as it's reached,
+    // and returns there. Frames already passed are re-set instantly, so every call can start
+    // from 0. Frames past the end of `rates` keep the last rate. `agent` is the script's own:
+    // both commands wait and run on its lua state
+    unsafe fn rate_curve(&mut self, agent: &mut L2CAgentBase, rates: &[f32], until: f32) {
+        let lua_state = agent.lua_state_agent;
+        let mut f = 0;
+        while (f as f32) < until {
+            smash::app::sv_animcmd::frame(lua_state, f as f32);
+            smash_script::macros::FT_MOTION_RATE(agent, rates[f.min(rates.len() - 1)]);
+            f += 1;
+        }
+        smash::app::sv_animcmd::frame(lua_state, until);
     }
 }
 

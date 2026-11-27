@@ -6,6 +6,10 @@ pub mod acmd;
 pub mod opff;
 pub mod status;
 
+// articles
+
+mod falconpunch;
+
 use smash::{
     lib::{
         L2CValue,
@@ -35,11 +39,26 @@ use crate::{
     consts::*,
 };
 use smashline::*;
+use config::{Custom, Special};
+
+const CUSTOMS: &[Custom] = &[
+    Custom { name: "Falcon Dash Punch", special: Special::Neutral, number: 2, statuses: None },
+    Custom { name: "Mighty Falcon Punch", special: Special::Neutral, number: 3, statuses: None },
+    Custom { name: "Heavy Raptor Boost", special: Special::Side, number: 2, statuses: None },
+    Custom { name: "Wind-Up Raptor Boost", special: Special::Side, number: 3, statuses: None },
+    Custom { name: "Falcon Strike", special: Special::Up, number: 2, statuses: None },
+    Custom { name: "Explosive Falcon Dive", special: Special::Up, number: 3, statuses: None },
+    Custom { name: "Falcon Kick Fury", special: Special::Down, number: 2, statuses: None },
+    Custom { name: "Lightning Falcon Kick", special: Special::Down, number: 3, statuses: None },
+];
 
 pub fn install() {
-    let agent = &mut movesets::agent("captain");
+    config::register_customs(*FIGHTER_KIND_CAPTAIN, "captain", CUSTOMS);
+    let agent = &mut config::agent("captain");
     acmd::install(agent);
     opff::install(agent);
     status::install(agent);
     agent.install();
+
+    falconpunch::install();
 }

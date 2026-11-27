@@ -1,24 +1,5 @@
 use super::*;
 
-pub fn install() {
-    skyline::nro::add_hook(nro_hook);
-    // hdr: HDR's patch (fighters/common/src/general_statuses/damage.rs)
-    skyline::patching::Patch::in_text(0x63251c).nop();
-}
-
-fn nro_hook(info: &skyline::nro::NroInfo) {
-    if info.name == "common" {
-        skyline::install_hooks!(
-            FighterStatusUniqProcessDamage_leave_stop_hook,
-            status_DamageFly_Main_hook,
-            exec_damage_elec_hit_stop_hook,
-            virtual_ftStatusUniqProcessDamage_exec_common,
-            FighterStatusDamage__correctDamageVectorEffect,
-            damage_fly_common_init
-        );
-    }
-}
-
 // hdr: based on HDR's version (fighters/common/src/general_statuses/damage.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_FighterStatusUniqProcessDamage_leave_stop)]
 pub unsafe fn FighterStatusUniqProcessDamage_leave_stop_hook(fighter: &mut L2CFighterCommon, arg2: L2CValue, arg3: L2CValue) -> L2CValue {
@@ -32,6 +13,7 @@ pub unsafe fn FighterStatusUniqProcessDamage_leave_stop_hook(fighter: &mut L2CFi
     control_module__update(control_module, false);
     ShakeModule::stop(fighter.module_accessor);
     let hashmap = fighter.local_func__fighter_status_damage_2();
+    check_asdi(fighter, hashmap["stop_delay_"].get_f32());
     FighterUtil::cheer_damage(fighter.module_accessor);
     fighter.check_ryu_final_damage_03(L2CValue::Bool(true));
     let release_action = fighter.get_int(*FIGHTER_STATUS_DAMAGE_WORK_INT_STOP_RELEASE_ACTION);
@@ -128,6 +110,109 @@ pub unsafe fn FighterStatusUniqProcessDamage_leave_stop_hook(fighter: &mut L2CFi
     0.into()
 }
 
+// hdr: HDR's ASDI (check_asdi, fighters/common/src/general_statuses/damage.rs): as hitlag ends, the
+// held stick moves the fighter by `hit_stop_delay_auto_mul` times the hit's SDI multiplier, on every hit.
+// none after a throw, as in HDR. bounces get theirs from bounce_release
+unsafe fn check_asdi(fighter: &mut L2CFighterCommon, sdi_mul: f32) {
+    if fighter.is_status_one_of(&[
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D
+    ])
+    || fighter.global_table[PREV_STATUS_KIND] == FIGHTER_STATUS_KIND_THROWN {
+        return;
+    }
+    // claude code: not on electric hits
+    fighter.clear_lua_stack();
+    lua_args!(fighter, hash40("attr"));
+    sv_information::damage_log_value(fighter.lua_state_agent);
+    let attr = fighter.pop_lua_stack(1).get_u64();
+    if attr == hash40("collision_attr_elec") {
+        return;
+    }
+    asdi(fighter, sdi_mul);
+}
+
+// claude code: the ASDI nudge itself, shared by hits (check_asdi) and bounces (bounce_release)
+unsafe fn asdi(fighter: &mut L2CFighterCommon, sdi_mul: f32) {
+    let stick_x = fighter.left_stick_x();
+    let stick_y = fighter.left_stick_y();
+    if (stick_x * stick_x + stick_y * stick_y).sqrt() < fighter.get_param_float("common", "hit_stop_delay_stick") {
+        return;
+    }
+    let speed_up_mul = if fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_DAMAGE_SPEED_UP) {
+        fighter.get_float(*FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_SPEED_UP_MAX_MAG)
+    } else {
+        1.0
+    };
+    let asdi = sdi_mul * fighter.get_param_float("common", "hit_stop_delay_auto_mul") * speed_up_mul;
+    let mut pos = *PostureModule::pos(fighter.module_accessor);
+    pos.x += asdi * stick_x;
+    pos.y += asdi * stick_y;
+    PostureModule::set_pos(fighter.module_accessor, &pos);
+}
+
+// claude code: DI, drift DI and SDI/ASDI on knockback collision. a launch that hits a wall, ceiling or
+// floor bounces (DAMAGE_FLY_REFLECT_*), and each bounce works like a fresh hit at full strength
+// (SDI multiplier 1): held SDI during the bounce's freeze, then DI and ASDI as it lets go
+// (bounce_collision). drift DI already covers the bounce statuses (drift_di). the freeze isn't hitlag:
+// vanilla's start_damage_reflect_stop (lua2cpp_common) switches the knockback energy off for
+// clamp(remaining hitstun x `damage_fly_reflect_stop_frame_rate`, `_min`, `_max`) frames
+pub fn is_bounce_status(status_kind: i32) -> bool {
+    [
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D
+    ].contains(&status_kind)
+}
+
+// claude code: DI on a bounce, the same as on a hit: the stick turns the rebound by up to common
+// `damage_fly_correction_max` degrees, toward the stick by how far it's held across the rebound's path
+unsafe fn bounce_di(fighter: &mut L2CFighterCommon) {
+    let speed_x = fighter.get_speed_x(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+    let speed_y = fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+    let speed = (speed_x * speed_x + speed_y * speed_y).sqrt();
+    let mut stick_x = fighter.left_stick_x();
+    let mut stick_y = fighter.left_stick_y();
+    let stick = (stick_x * stick_x + stick_y * stick_y).sqrt();
+    if speed <= 0.0 || stick <= 0.0 {
+        return;
+    }
+    if stick > 1.0 {
+        stick_x /= stick;
+        stick_y /= stick;
+    }
+    let across = (speed_x * stick_y - speed_y * stick_x) / speed;
+    let angle = (fighter.get_param_float("common", "damage_fly_correction_max") * across).to_radians();
+    let (sin, cos) = angle.sin_cos();
+    fighter.set_speed(Vector2f::new(speed_x * cos - speed_y * sin, speed_x * sin + speed_y * cos), *FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+}
+
+// claude code: in a bounce's freeze: a bounce status whose knockback energy is still switched off
+pub unsafe fn is_bounce_freeze(fighter: &mut L2CFighterCommon) -> bool {
+    is_bounce_status(fighter.status())
+    && !VarModule::is_flag(fighter.battle_object, vars::common::status::BOUNCE_RELEASED)
+    && !KineticModule::is_enable_energy(fighter.module_accessor, *FIGHTER_KINETIC_ENERGY_ID_DAMAGE)
+}
+
+// claude code: held SDI through the freeze, then DI and ASDI once on the first frame out of it. runs
+// every frame from sys_line_system_control_fighter (opff.rs)
+pub unsafe fn bounce_collision(fighter: &mut L2CFighterCommon) {
+    if !is_bounce_status(fighter.status())
+    || VarModule::is_flag(fighter.battle_object, vars::common::status::BOUNCE_RELEASED) {
+        return;
+    }
+    if is_bounce_freeze(fighter) {
+        if let Some((x, y)) = general_statuses::held_sdi(fighter, 1.0) {
+            general_statuses::apply_sdi(fighter, x, y);
+        }
+        return;
+    }
+    VarModule::on_flag(fighter.battle_object, vars::common::status::BOUNCE_RELEASED);
+    bounce_di(fighter);
+    asdi(fighter, 1.0);
+}
+
 // hdr: based on HDR's version (fighters/common/src/general_statuses/damage.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_DamageFly_Main)]
 unsafe fn status_DamageFly_Main_hook(fighter: &mut L2CFighterCommon) -> L2CValue {
@@ -186,6 +271,14 @@ pub unsafe fn exec_damage_elec_hit_stop_hook(fighter: &mut L2CFighterCommon) {
         if is_paralyze
         && fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_PARALYZE_STOP) {
             return;
+        }
+        // claude code: held SDI (general_statuses/mod.rs) in place of vanilla's flick SDI. a bounce's
+        // freeze has its own (bounce_sdi)
+        if !is_paralyze && !is_bounce_status(fighter.status()) {
+            let sdi_mul = hashmap["stop_delay_"].get_f32();
+            if let Some((x, y)) = general_statuses::held_sdi(fighter, sdi_mul) {
+                general_statuses::apply_sdi(fighter, x, y);
+            }
         }
     } else {
         ShakeModule::stop(fighter.module_accessor);
@@ -270,11 +363,64 @@ pub unsafe fn damage_fly_common_init(fighter: &mut L2CFighterCommon) {
         fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D);
     }
     original!()(fighter);
-    // claude code: FORCE_KNOCKDOWN also takes away the tech for this launch, so it always ends lying down
+    // claude code: and again once the original has run
     if force_knockdown {
         fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D);
-        fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_PASSIVE);
-        fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_PASSIVE_FB);
-        WorkModule::on_flag(fighter.module_accessor, *FIGHTER_STATUS_DAMAGE_FLAG_FLY_DISABLE_PASSIVE);
     }
+}
+
+pub unsafe extern "C" fn non_tumble_di(fighter: &mut L2CFighterCommon) {
+    if fighter.is_status(*FIGHTER_STATUS_KIND_DAMAGE_AIR) {
+        fighter.FighterStatusDamage__correctDamageVectorEffect(L2CValue::Bool(false));
+    }
+}
+
+pub unsafe extern "C" fn drift_di(fighter: &mut L2CFighterCommon) {
+    let damage_statuses = &[
+        *FIGHTER_STATUS_KIND_DAMAGE,
+        *FIGHTER_STATUS_KIND_DAMAGE_AIR,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D,
+        *FIGHTER_STATUS_KIND_DAMAGE_FALL,
+        *FIGHTER_STATUS_KIND_GUARD_DAMAGE
+    ];
+    if fighter.is_situation(*SITUATION_KIND_AIR)
+    && fighter.is_status_one_of(damage_statuses) 
+    && !StopModule::is_stop(fighter.module_accessor) {
+        let damage_speed_x = fighter.get_speed_x(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+        let damage_speed_y = fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+        let mut initial_speed_x = VarModule::get_float(fighter.battle_object, vars::common::status::INITIAL_KNOCKBACK_VEL_X);
+        let mut initial_speed_y = VarModule::get_float(fighter.battle_object, vars::common::status::INITIAL_KNOCKBACK_VEL_Y);
+        if initial_speed_x == 0.0 && initial_speed_y == 0.0 {
+            VarModule::set_float(fighter.battle_object, vars::common::status::INITIAL_KNOCKBACK_VEL_X, damage_speed_x);
+            VarModule::set_float(fighter.battle_object, vars::common::status::INITIAL_KNOCKBACK_VEL_Y, damage_speed_y);
+            initial_speed_x = VarModule::get_float(fighter.battle_object, vars::common::status::INITIAL_KNOCKBACK_VEL_X);
+            initial_speed_y = VarModule::get_float(fighter.battle_object, vars::common::status::INITIAL_KNOCKBACK_VEL_Y);
+        }
+        let drift_value = fighter.left_stick_x() * (0.0075 *  (1.0 - (initial_speed_x.abs() / 3.0).clamp(0.0, 1.0)));
+        fighter.set_speed(Vector2f::new(damage_speed_x + drift_value, damage_speed_y), *FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+    }
+}
+
+fn nro_hook(info: &skyline::nro::NroInfo) {
+    if info.name == "common" {
+        skyline::install_hooks!(
+            FighterStatusUniqProcessDamage_leave_stop_hook,
+            status_DamageFly_Main_hook,
+            exec_damage_elec_hit_stop_hook,
+            virtual_ftStatusUniqProcessDamage_exec_common,
+            FighterStatusDamage__correctDamageVectorEffect,
+            damage_fly_common_init
+        );
+    }
+}
+
+pub fn install() {
+    skyline::nro::add_hook(nro_hook);
+    // hdr: HDR's patch (fighters/common/src/general_statuses/damage.rs)
+    skyline::patching::Patch::in_text(0x63251c).nop();
 }

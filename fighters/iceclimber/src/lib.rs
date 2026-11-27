@@ -37,13 +37,13 @@ use crate::{
 use smashline::*;
 
 pub fn install() {
-    let popo = &mut movesets::agent("popo");
+    let popo = &mut config::agent("popo");
     acmd::install(popo);
     opff::install(popo);
     status::install(popo);
     popo.install();
 
-    let nana = &mut movesets::agent("nana");
+    let nana = &mut config::agent("nana");
     acmd::install(nana);
     opff::install(nana);
     status::install(nana);
