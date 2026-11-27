@@ -6,7 +6,7 @@ mod walk_dash_run_turn;
 mod attackx4;
 pub mod damage;
 pub mod djc;
-mod down;
+pub mod down;
 mod downdamage;
 pub mod lasso;
 pub mod shield;
@@ -79,24 +79,57 @@ pub unsafe fn try_wall_jump(fighter: &mut L2CFighterCommon) -> bool {
     }
 
     let wall_jump_type = WorkModule::get_param_int(fighter.module_accessor, hash40("wall_jump_type"), 0);
-    if wall_jump_type == *FIGHTER_WALL_JUMP_TYPE_NORMAL {
-        if fighter.sub_fighter_general_term_is_can_wall_jump().get_bool() {
-            fighter.change_status(FIGHTER_STATUS_KIND_WALL_JUMP.into(), true.into());
-            return true;
-        }
-        // claude code: wall jumps facing away from the wall. the vanilla check only passes when facing
-        // the wall, so ask it again turned around. if that passes, stay turned around: the wall jump
-        // then starts facing the wall, exactly like a normal one
-        PostureModule::reverse_lr(fighter.module_accessor);
-        if fighter.sub_fighter_general_term_is_can_wall_jump().get_bool() {
-            PostureModule::update_rot_y_lr(fighter.module_accessor);
-            fighter.change_status(FIGHTER_STATUS_KIND_WALL_JUMP.into(), true.into());
-            return true;
-        }
-        PostureModule::reverse_lr(fighter.module_accessor);
+    if wall_jump_type == *FIGHTER_WALL_JUMP_TYPE_NORMAL
+    && fighter.boma().is_button_trigger(Buttons::Jump)
+    && face_wall(fighter) {
+        // the press is the wall jump's, so it can't also start a double jump this frame
+        ControlModule::clear_command_one(fighter.module_accessor, *FIGHTER_PAD_COMMAND_CATEGORY1, *FIGHTER_PAD_CMD_CAT1_JUMP);
+        ControlModule::clear_command_one(fighter.module_accessor, *FIGHTER_PAD_COMMAND_CATEGORY1, *FIGHTER_PAD_CMD_CAT1_JUMP_BUTTON);
+        fighter.change_status(FIGHTER_STATUS_KIND_WALL_JUMP.into(), true.into());
+        return true;
     }
 
     return false;
+}
+
+// claude code: Divergence's wall jump input (2026-11-27, Grant's design): a wall beside them, upright or
+// slanted up to lasso::WALL_ANGLE_MAX off upright, and a press of the jump button. it replaces vanilla's
+// check (sub_fighter_general_term_is_can_wall_jump, decompiled 2026-11-27), which wanted a flick away from
+// the wall (wall_jump_stick_x within wall_jump_flick_x frames), a slow enough speed off it
+// (wall_jump_enable_x_speed), and only took what the engine calls a wall touch (GroundModule::is_touch
+// LEFT/RIGHT + is_attachable), which leaves slanted walls out. the wall is found the way the tether's
+// lasso::find_wall finds one: a ray, the angle read off the wall's normal, here 4 and 10 units up from
+// their feet and 8 out to each side (all times their scale). the nearest wall wins. wall clings
+// (attach_wall_type, above) keep vanilla's check
+const WALL_REACH: f32 = 8.0;
+const WALL_HEIGHTS: [f32; 2] = [4.0, 10.0];
+
+// true = a wall is beside them, and they're turned to face it, the way a wall jump starts
+unsafe fn face_wall(fighter: &mut L2CFighterCommon) -> bool {
+    let boma = fighter.module_accessor;
+    let scale = PostureModule::scale(boma);
+    let x = PostureModule::pos_x(boma);
+    let mut nearest: Option<(f32, f32)> = None; // (distance, side: 1 = wall on the right)
+    for side in [-1.0f32, 1.0] {
+        for height in WALL_HEIGHTS {
+            let start = Vector2f::new(x, PostureModule::pos_y(boma) + height * scale);
+            let ray = Vector2f::new(WALL_REACH * side * scale, 0.0);
+            let pos = &mut Vector2f::zero();
+            let normal = &mut Vector2f::zero();
+            if GroundModule::ray_check_hit_pos_normal(boma, &start, &ray, pos, normal, true) & 1 != 0
+            && normal.x * side < 0.0
+            && normal.y.atan2(normal.x.abs()).to_degrees().abs() < lasso::WALL_ANGLE_MAX {
+                let distance = (pos.x - x).abs();
+                if nearest.map_or(true, |(best, _)| distance < best) {
+                    nearest = Some((distance, side));
+                }
+            }
+        }
+    }
+    let Some((_, side)) = nearest else { return false };
+    PostureModule::set_lr(boma, side);
+    PostureModule::update_rot_y_lr(boma);
+    true
 }
 
 // hdr: based on HDR's version (fighters/common/src/general_statuses/mod.rs)
@@ -201,7 +234,7 @@ pub unsafe fn status_FallSub_hook(fighter: &mut L2CFighterCommon, arg2: L2CValue
     call_original!(fighter, arg2);
     let move_speed = KineticModule::get_sum_speed_x(fighter.module_accessor, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_ALL) - KineticModule::get_sum_speed_x(fighter.module_accessor, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_GROUND) - KineticModule::get_sum_speed_x(fighter.module_accessor, *KINETIC_ENERGY_RESERVE_ATTRIBUTE_EXTERN);
     if move_speed * fighter.lr() < 0.0
-    && MotionModule::motion_kind(fighter.module_accessor) != hash40("fall") {
+    && !fighter.boma().is_motion(Hash40::new("fall")) {
         MotionModule::change_motion(fighter.module_accessor, Hash40::new("fall"), 0.0, 1.0, false, 0.0, false, false);
         fighter.off_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_RUN_FALL);
     }

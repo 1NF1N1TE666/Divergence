@@ -13,7 +13,9 @@ use super::*;
 use smash_rs::cpp::simd::Vector4;
 
 const WALL_HIT_MAX: i32 = 1; // wall_hit_max, latches until landing
-const WALL_ANGLE_MAX: f32 = 69.0; // wall_angle_max, degrees off upright
+// degrees off upright (Byleth's wall_angle_max is 69; Grant set 45, 2026-11-27). wall jumps share it
+// (general_statuses::slanted_wall_jump)
+pub const WALL_ANGLE_MAX: f32 = 45.0;
 
 // how far a tether looks for a wall, from its ledge box (cliff_hang_data in the fighter's vl.prc): forward,
 // up and down from where it aims. forward < 0 looks behind (Belmont back airs)
@@ -37,10 +39,10 @@ const fn zair_box(forward: f32, up: f32, down: f32) -> Option<Reach> {
 // special grabs walls already
 unsafe fn reach(boma: &mut BattleObjectModuleAccessor) -> Option<Reach> {
     let kind = boma.kind();
-    let status = StatusModule::status_kind(boma);
+    let status = boma.status();
     if [*FIGHTER_KIND_SIMON, *FIGHTER_KIND_RICHTER].contains(&kind) {
         if status != *FIGHTER_STATUS_KIND_ATTACK_AIR
-        || !WorkModule::is_flag(boma, *FIGHTER_SIMON_INSTANCE_WORK_ID_FLAG_ATTACK_AIR_LASSO_FLAG_CHECK) {
+        || !boma.is_flag(*FIGHTER_SIMON_INSTANCE_WORK_ID_FLAG_ATTACK_AIR_LASSO_FLAG_CHECK) {
             return None;
         }
         // the box their AttackAir main loop picks for each whip motion (FIGHTER_SIMON_CLIFF_HANG_DATA_AIR_LASSO_*)
@@ -54,7 +56,7 @@ unsafe fn reach(boma: &mut BattleObjectModuleAccessor) -> Option<Reach> {
             _ => reach_box(70.0, 58.0, -15.0) // F_HI
         };
     }
-    if !WorkModule::is_flag(boma, *FIGHTER_STATUS_AIR_LASSO_FLAG_CHECK) {
+    if !boma.is_flag(*FIGHTER_STATUS_AIR_LASSO_FLAG_CHECK) {
         return None;
     }
     if status == *FIGHTER_STATUS_KIND_AIR_LASSO {
@@ -91,7 +93,7 @@ pub unsafe fn is_latched(boma: &mut BattleObjectModuleAccessor) -> bool {
 // the wall spot, kept where the ledge checks can point to it: one per player
 unsafe fn wall_pos(boma: &mut BattleObjectModuleAccessor) -> *const [f32; 4] {
     static mut WALL_POS: [[f32; 4]; 8] = [[0.0; 4]; 8];
-    let entry = WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID).clamp(0, 7) as usize;
+    let entry = boma.get_int(*FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID).clamp(0, 7) as usize;
     WALL_POS[entry] = [
         VarModule::get_float(boma.object(), vars::common::instance::TETHER_WALL_X),
         VarModule::get_float(boma.object(), vars::common::instance::TETHER_WALL_Y),
@@ -104,7 +106,7 @@ unsafe fn wall_pos(boma: &mut BattleObjectModuleAccessor) -> *const [f32; 4] {
 // looks for a wall within reach: level first (or the box's height nearest level), then up and down to the
 // corners of the ledge box. gives the spot and the side it's on (1 = right)
 unsafe fn find_wall(boma: &mut BattleObjectModuleAccessor, reach: &Reach) -> Option<(Vector2f, f32)> {
-    let side = PostureModule::lr(boma) * reach.forward.signum();
+    let side = boma.lr() * reach.forward.signum();
     let scale = PostureModule::scale(boma);
     let start = if reach.from_shoulder {
         let shoulder = &mut Vector3f::zero();

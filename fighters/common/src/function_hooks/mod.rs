@@ -48,7 +48,7 @@ pub unsafe fn is_cpu(boma: &mut BattleObjectModuleAccessor) -> bool {
         return false;
     }
     // fighters outside the 8 player entries (bosses, spirit stand-ins...) have nothing to look up
-    let entry_id = WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
+    let entry_id = boma.get_int(*FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     if !(0..8).contains(&entry_id) {
         return false;
     }

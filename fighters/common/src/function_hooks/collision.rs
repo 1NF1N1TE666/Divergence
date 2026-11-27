@@ -30,7 +30,7 @@ unsafe fn ground_module_ecb_point_calc_hook(ground_module: u64, param_1: *mut *m
         *FIGHTER_STATUS_KIND_CAPTURE_DAMAGE,
         *FIGHTER_STATUS_KIND_THROWN])
     || !(*boma).is_situation(*SITUATION_KIND_AIR)
-    || WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_FRAME_IN_AIR) < 9 {
+    || (*boma).get_int(*FIGHTER_INSTANCE_WORK_ID_INT_FRAME_IN_AIR) < 9 {
         *param_3 = 0.0;
     }
 

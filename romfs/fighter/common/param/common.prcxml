@@ -53,7 +53,10 @@
   <float hash="damage_fly_length_mul_min">1</float>
   <int hash="damage_fly_attack_frame">999999</int>
   <int hash="damage_fly_escape_frame">999999</int>
+  <float hash="down_frame">120</float>
+  <float hash="damage_fly_reflect_speed">0.1</float>
   <float hash="damage_fly_reflect_speed_mul">1</float>
+  <float hash="damage_fly_reflect_d_speed">0.1</float>
   <float hash="damage_fly_reflect_d_speed_mul">1</float>
   <float hash="damage_fly_reflect_reaction_frame_mul">1</float>
   <int hash="damage_fly_reflect_stop_frame_min">1</int>

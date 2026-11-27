@@ -69,7 +69,7 @@ pub unsafe fn FighterStatusUniqProcessDamage_leave_stop_hook(fighter: &mut L2CFi
             if [*FIGHTER_STATUS_KIND_DAMAGE_AIR, *FIGHTER_STATUS_KIND_DAMAGE_FLY, *FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR].contains(&status_kind) {
                 let is_pierce = fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_TO_PIERCE);
                 let rate = fighter.calc_damage_motion_rate(L2CValue::U64(damage_motion_kind), L2CValue::F32(start_frame), L2CValue::Bool(is_pierce)).get_f32();
-                MotionModule::set_rate(fighter.module_accessor, rate);
+                fighter.boma().set_rate(rate);
                 let damage_fly_angle_compose = fighter.sub_FighterStatusDamage_get_damage_fly_angle_compose().get_i32();
                 let damage_fly_angle = FighterUtil::set_damage_fly_angle(fighter.module_accessor, 0.0, 1.0, 360.0, MotionNodeRotateCompose{_address: damage_fly_angle_compose as u8});
                 fighter.set_float(damage_fly_angle, *FIGHTER_STATUS_DAMAGE_WORK_FLOAT_ROT_ANGLE);
@@ -100,7 +100,7 @@ pub unsafe fn FighterStatusUniqProcessDamage_leave_stop_hook(fighter: &mut L2CFi
                     }
                 } else {
                     let rate = cancel_frame / reaction_frame_mul_speed_up;
-                    MotionModule::set_rate(fighter.module_accessor, rate);
+                    fighter.boma().set_rate(rate);
                 }
             }
         }
@@ -213,12 +213,72 @@ pub unsafe fn bounce_collision(fighter: &mut L2CFighterCommon) {
     asdi(fighter, 1.0);
 }
 
+// claude code: every launch that lands while still in hitstun floor-bounces, not just spikes. vanilla's
+// floor check (sub_AirChkDamageReflectFloor, lua2cpp_common 0x71000fb4d0, decompiled 2026-11-27) only
+// bounces a fighter on the ground whose knockback energy alone is moving down faster than common
+// `damage_fly_reflect_d_speed`, whose last bounce wasn't off the floor, and who has bounced fewer than
+// `damage_fly_reflect_max` times. a normal launch falls on gravity, not knockback (its knockback energy
+// is still going up or level), so only a spike ever passes. this hands the launch's real fall speed
+// (knockback + gravity, from its last airborne frame) to the knockback energy first, so the landing
+// looks like a spike to the check and vanilla bounces it the same way. gravity is zeroed with it (its
+// share is in the knockback energy now). the "last bounce wasn't off the floor" rule is dropped too, so
+// floor bounces can chain; `damage_fly_reflect_max` still caps the total. KNOCKED_DOWN launches have
+// the floor-bounce term off, so they still land
+unsafe fn launch_statuses() -> [i32; 6] {
+    [
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_LR,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_U,
+        *FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D
+    ]
+}
+
+// claude code: every frame (sys_line, opff.rs): the launch's vertical speed while it's airborne
+pub unsafe fn record_launch_speed(fighter: &mut L2CFighterCommon) {
+    if !fighter.is_situation(*SITUATION_KIND_AIR)
+    || !fighter.is_status_one_of(&launch_statuses()) {
+        return;
+    }
+    let speed_y = fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE) + fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_GRAVITY);
+    VarModule::set_float(fighter.battle_object, vars::common::instance::LAUNCH_SPEED_Y, speed_y);
+}
+
+#[skyline::hook(replace = L2CFighterCommon_sub_AirChkDamageReflectFloor)]
+unsafe fn sub_AirChkDamageReflectFloor_hook(fighter: &mut L2CFighterCommon) -> L2CValue {
+    if fighter.is_situation(*SITUATION_KIND_GROUND)
+    && fighter.is_status_one_of(&launch_statuses())
+    && WorkModule::is_enable_transition_term(fighter.module_accessor, *FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D) {
+        let fall_speed = VarModule::get_float(fighter.battle_object, vars::common::instance::LAUNCH_SPEED_Y);
+        let speed_x = fighter.get_speed_x(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+        let speed_y = fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+        if fall_speed < speed_y {
+            fighter.set_speed(Vector2f::new(speed_x, fall_speed), *FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+            // the knockback energy now carries the gravity's share of the fall too, so gravity starts
+            // over from 0. left alone it kept pulling down after the bounce and ate the rebound
+            sv_kinetic_energy!(set_speed, fighter, FIGHTER_KINETIC_ENERGY_ID_GRAVITY, 0.0);
+        }
+        // the last bounce being off the floor doesn't stop this one. put back if there's no bounce
+        let last_dir = fighter.get_int(*FIGHTER_STATUS_WORK_ID_INT_DAMAGE_REFLECT_LAST_DIR);
+        if last_dir == *FIGHTER_STATUS_DAMAGE_REFLECT_DIR_DOWN {
+            fighter.set_int(*FIGHTER_STATUS_DAMAGE_REFLECT_DIR_NONE, *FIGHTER_STATUS_WORK_ID_INT_DAMAGE_REFLECT_LAST_DIR);
+            let ret = call_original!(fighter);
+            if !ret.get_bool() {
+                fighter.set_int(last_dir, *FIGHTER_STATUS_WORK_ID_INT_DAMAGE_REFLECT_LAST_DIR);
+            }
+            return ret;
+        }
+    }
+    call_original!(fighter)
+}
+
 // hdr: based on HDR's version (fighters/common/src/general_statuses/damage.rs)
 #[skyline::hook(replace = L2CFighterCommon_status_DamageFly_Main)]
 unsafe fn status_DamageFly_Main_hook(fighter: &mut L2CFighterCommon) -> L2CValue {
     if !fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_FINISH_CAMERA_TARGET) {
         if fighter.motion_frame() >= (MotionModule::end_frame(fighter.module_accessor) - 1.0) && MotionModule::rate(fighter.module_accessor) != 0.0 {
-            MotionModule::set_rate(fighter.module_accessor, 0.0);
+            fighter.boma().set_rate(0.0);
         }
         if WorkModule::is_enable_transition_term(fighter.module_accessor, *FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FALL) 
         && fighter.is_flag(*FIGHTER_STATUS_DAMAGE_FLAG_END_REACTION) {
@@ -355,16 +415,25 @@ pub unsafe fn FighterStatusDamage__correctDamageVectorEffect(fighter: &mut L2CFi
     ret
 }
 
+// claude code: a FORCE_KNOCKDOWN hit marks its launch KNOCKED_DOWN, which lasts through the launch's
+// wall and ceiling bounces (they run this again) and ends on any other new launch. a KNOCKED_DOWN
+// launch never floor-bounces, so it lands in the getup-less down (down.rs)
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_DamageFlyCommon_init)]
 pub unsafe fn damage_fly_common_init(fighter: &mut L2CFighterCommon) {
     let force_knockdown = VarModule::is_flag(fighter.battle_object, vars::common::instance::FORCE_KNOCKDOWN);
     VarModule::off_flag(fighter.battle_object, vars::common::instance::FORCE_KNOCKDOWN);
     if force_knockdown {
+        VarModule::on_flag(fighter.battle_object, vars::common::instance::KNOCKED_DOWN);
+    } else if !is_bounce_status(fighter.status()) {
+        VarModule::off_flag(fighter.battle_object, vars::common::instance::KNOCKED_DOWN);
+    }
+    let knocked_down = VarModule::is_flag(fighter.battle_object, vars::common::instance::KNOCKED_DOWN);
+    if knocked_down {
         fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D);
     }
     original!()(fighter);
     // claude code: and again once the original has run
-    if force_knockdown {
+    if knocked_down {
         fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D);
     }
 }
@@ -411,6 +480,7 @@ fn nro_hook(info: &skyline::nro::NroInfo) {
         skyline::install_hooks!(
             FighterStatusUniqProcessDamage_leave_stop_hook,
             status_DamageFly_Main_hook,
+            sub_AirChkDamageReflectFloor_hook,
             exec_damage_elec_hit_stop_hook,
             virtual_ftStatusUniqProcessDamage_exec_common,
             FighterStatusDamage__correctDamageVectorEffect,

@@ -8,8 +8,8 @@ unsafe extern "C" fn dropkick_landing(fighter: &mut L2CFighterCommon) {
     let boma = fighter.boma();
     if !boma.is_status(*FIGHTER_STATUS_KIND_SPECIAL_LW)
     || !boma.is_situation(*SITUATION_KIND_GROUND)
-    || MotionModule::motion_kind(boma) != hash40("special_lw")
-    || MotionModule::frame(boma) <= 13.0
+    || !boma.is_motion(Hash40::new("special_lw"))
+    || boma.motion_frame() <= 13.0
     || config::custom_number(boma, Special::Down) != 2 {
         return;
     }

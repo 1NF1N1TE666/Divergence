@@ -58,8 +58,7 @@ pub unsafe extern "C" fn parry_window(fighter: &mut L2CFighterCommon) {
 // parries through every hit of a multi-hit move. runs from sys_line_system_control_fighter, which
 // still runs during hitlag
 pub unsafe fn parry_reward(fighter: &mut L2CFighterCommon) {
-    let is_shield_held = ControlModule::check_button_on(fighter.module_accessor, *CONTROL_PAD_BUTTON_GUARD)
-    || ControlModule::check_button_on(fighter.module_accessor, *CONTROL_PAD_BUTTON_GUARD_HOLD);
+    let is_shield_held = fighter.boma().is_button_on(Buttons::Guard | Buttons::GuardHold);
     if !is_shield_held {
         VarModule::off_flag(fighter.battle_object, vars::common::instance::PARRY_SHIELD_HELD);
     }

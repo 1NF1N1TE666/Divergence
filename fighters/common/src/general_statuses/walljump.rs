@@ -118,7 +118,7 @@ unsafe fn status_wall_jump(fighter: &mut L2CFighterCommon) -> L2CValue {
     lasso::leave_wall(fighter);
     restore_specials(fighter);
     if fighter.get_num_used_jumps() == fighter.get_jump_count_max() {
-        WorkModule::dec_int(fighter.module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
+        fighter.boma().dec_int(*FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
     }
     original!()(fighter)
 }
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn wall_jump_anytime(fighter: &mut L2CFighterCommon) {
     || StatusModule::is_changing(fighter.module_accessor)
     || StopModule::is_stop(fighter.module_accessor)
     || !wall_jump_anytime_status(fighter.status())
-    || WorkModule::is_flag(fighter.module_accessor, *FIGHTER_INSTANCE_WORK_ID_FLAG_FINAL)
+    || fighter.boma().is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_FINAL)
     || LinkModule::get_node_object_id(fighter.module_accessor, *LINK_NO_CAPTURE) as u32 != *BATTLE_OBJECT_ID_INVALID as u32
     || (0..8).any(|id| AttackModule::is_attack(fighter.module_accessor, id, false)) {
         return;

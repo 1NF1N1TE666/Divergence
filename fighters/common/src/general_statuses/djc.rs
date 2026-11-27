@@ -35,7 +35,7 @@ pub unsafe fn djc_inherit_pre(fighter: &mut L2CFighterCommon) {
         return;
     }
     let frame = fighter.motion_frame();
-    let held = ControlModule::check_button_on(fighter.module_accessor, *CONTROL_PAD_BUTTON_JUMP) || frame < 2.0;
+    let held = fighter.boma().is_button_on(Buttons::Jump) || frame < 2.0;
     if !held {
         return;
     }
@@ -55,7 +55,7 @@ pub unsafe fn djc_inherit_frame(fighter: &mut L2CFighterCommon, statuses: &[i32]
         return;
     }
     let boma = fighter.module_accessor;
-    if !statuses.contains(&StatusModule::status_kind(boma))
+    if !statuses.contains(&(*boma).status())
     || fighter.global_table[SITUATION_KIND] != SITUATION_KIND_AIR {
         VarModule::set_int(fighter.battle_object, vars::common::instance::DJC_KINETIC, -1);
         return;
@@ -77,7 +77,7 @@ pub unsafe fn djc_inherit_frame(fighter: &mut L2CFighterCommon, statuses: &[i32]
         || MotionModule::frame_2nd(boma) + 1.0 >= MotionModule::end_frame_from_hash(boma, Hash40::new_raw(motion_2nd));
     let released = MotionModule::frame_2nd(boma) >= 2.0
         && fighter.global_table[CURRENT_FRAME].get_i32() <= 6
-        && ControlModule::check_button_off(boma, *CONTROL_PAD_BUTTON_JUMP);
+        && (*boma).is_button_off(Buttons::Jump);
     if jump_over || released {
         VarModule::set_int(fighter.battle_object, vars::common::instance::DJC_KINETIC, -1);
         if kinetic == *FIGHTER_KINETIC_TYPE_JUMP_AERIAL_MOTION_2ND
@@ -146,7 +146,7 @@ unsafe fn sub_attack_air_inherit_jump_aerial_motion_uniq_process_init(fighter: &
     && !fighter.is_flag(*FIGHTER_INSTANCE_WORK_ID_FLAG_IGNORE_2ND_MOTION) {
         MotionModule::add_motion_2nd(fighter.module_accessor, Hash40::new_raw(motion_kind), frame, 1.0, false, 1.0);
         MotionModule::set_weight(fighter.module_accessor, 1.0, true);
-        if ControlModule::check_button_on(fighter.module_accessor, *CONTROL_PAD_BUTTON_JUMP) || frame < 2.0 {
+        if fighter.boma().is_button_on(Buttons::Jump) || frame < 2.0 {
             KineticModule::change_kinetic(fighter.module_accessor, *FIGHTER_KINETIC_TYPE_JUMP_AERIAL_MOTION_2ND);
         } else {
             dj_cancel(fighter);
@@ -165,7 +165,7 @@ unsafe fn sub_attack_air_inherit_jump_aerial_motion_uniq_process_exec(fighter: &
     && fighter.global_table[FIGHTER_KIND] != FIGHTER_KIND_DEMON
     && MotionModule::frame_2nd(fighter.module_accessor) >= 2.0
     && fighter.global_table[CURRENT_FRAME].get_i32() <= 6
-    && ControlModule::check_button_off(fighter.module_accessor, *CONTROL_PAD_BUTTON_JUMP) {
+    && fighter.boma().is_button_off(Buttons::Jump) {
         dj_cancel(fighter);
     }
     call_original!(fighter)

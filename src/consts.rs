@@ -106,6 +106,7 @@ pub mod vars {
             pub const SPECIALS_FORCED: i32 = 0x0048; // inside the air special check, refreshed specials let through
             // claude code: shield breaks (fighters/common/src/general_statuses/shield.rs)
             pub const SHIELD_BROKEN: i32 = 0x0050; // shield broke this stock, no shield until respawn
+            pub const KNOCKED_DOWN: i32 = 0x0051; // claude code: launched by a FORCE_KNOCKDOWN hit, lands in the getup-less down (general_statuses/down.rs)
 
             // ints
             pub const LEFT_STICK_FLICK_X: i32 = 0x0003;
@@ -124,6 +125,7 @@ pub mod vars {
             pub const AURA_EFFECT_L: i32 = 0x0010; // claude code: aura mode's left effect handle, 0 = none
             pub const AURA_EFFECT_R: i32 = 0x0011; // claude code: aura mode's right effect handle, 0 = none
             pub const AURA_SPOT: i32 = 0x0012; // claude code: aura mode, where the effect goes (modes.rs, SPOT_*), 0 = not worked out yet
+            pub const DOWN_FRAME: i32 = 0x0013; // claude code: frames spent lying in a forced knockdown (general_statuses/down.rs)
 
             // floats
             pub const ECB_BOTTOM_Y_OFFSET: i32 = 0x0006;
@@ -133,6 +135,7 @@ pub mod vars {
             pub const TETHER_WALL_X: i32 = 0x000A; // claude code: where a tether is latched (general_statuses/lasso.rs)
             pub const TETHER_WALL_Y: i32 = 0x000B;
             pub const TETHER_WALL_LR: i32 = 0x000C; // claude code: the way to the wall
+            pub const LAUNCH_SPEED_Y: i32 = 0x000D; // claude code: a launch's vertical speed (knockback + gravity) last airborne frame (general_statuses/damage.rs)
             pub const FAUX_AIR_SPEED_Y: i32 = 0x0020; // claude code: faux vertical speed, kept across status changes
             // claude code: aura mode (fighters/common/src/modes.rs)
             pub const AURA_POWER: i32 = 0x0030; // a fighter's Aura multiplier, or a weapon's (taken from its owner), 0 = not worked out yet

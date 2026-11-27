@@ -99,7 +99,7 @@ unsafe fn motion_update(energy: &mut MotionEnergy, boma: &mut BattleObjectModule
     // jab's own forward motion into the stop speed, stacking it every loop until it flies off stage.
     // a jab started straight out of a jab carries no momentum
     let is_jab_repeat = boma.is_status(*FIGHTER_STATUS_KIND_ATTACK)
-        && StatusModule::prev_status_kind(boma, 0) == *FIGHTER_STATUS_KIND_ATTACK;
+        && boma.is_prev_status(*FIGHTER_STATUS_KIND_ATTACK);
     let mut is_stop_added = false;
     if !energy.update_flag && !is_jab_repeat && boma.is_status_one_of(&[*FIGHTER_STATUS_KIND_ATTACK_HI4_START, *FIGHTER_STATUS_KIND_ATTACK_HI4_HOLD, *FIGHTER_STATUS_KIND_ATTACK_HI4, *FIGHTER_STATUS_KIND_ATTACK_S4_START, *FIGHTER_STATUS_KIND_ATTACK_S4_HOLD, *FIGHTER_STATUS_KIND_ATTACK_S4, *FIGHTER_STATUS_KIND_ATTACK_LW4_START, *FIGHTER_STATUS_KIND_ATTACK_LW4_HOLD, *FIGHTER_STATUS_KIND_ATTACK_LW4, *FIGHTER_STATUS_KIND_ATTACK, *FIGHTER_STATUS_KIND_ATTACK_100, *FIGHTER_STATUS_KIND_ATTACK_HI3, *FIGHTER_STATUS_KIND_ATTACK_S3, *FIGHTER_STATUS_KIND_ATTACK_LW3]) {
         let stop_energy = KineticModule::get_energy(boma, *FIGHTER_KINETIC_ENERGY_ID_STOP) as *mut app::KineticEnergy;
@@ -166,7 +166,7 @@ unsafe fn motion_update(energy: &mut MotionEnergy, boma: &mut BattleObjectModule
         AirTransAngle => PaddedVec2::new(move_speed.x * energy.angle.cos() - move_speed.y * energy.angle.sin(), move_speed.y * energy.angle.cos() + move_speed.x * energy.angle.sin()),
         AirTransY => PaddedVec2::new(0.0, move_speed.y),
         AirTransAngleSuperJumpPunch => {
-            let stick_x = ControlModule::get_stick_x(boma);
+            let stick_x = boma.stick_x();
             let dir = boma.get_float(*FIGHTER_STATUS_SUPER_JUMP_PUNCH_WORK_FLOAT_CONST_DIR_STICK_X);
             if stick_x.abs() > dir {
                 let interp = (stick_x.abs() - dir) / (1.0 - dir) * boma.get_float(*FIGHTER_STATUS_SUPER_JUMP_PUNCH_WORK_FLOAT_CONST_DIR_MUL);
@@ -186,7 +186,7 @@ unsafe fn motion_update(energy: &mut MotionEnergy, boma: &mut BattleObjectModule
             PaddedVec2::new(v.x() * mul, v.y() * mul)
         }
         LadderMove => {
-            let stick_y = ControlModule::get_stick_y(boma);
+            let stick_y = boma.stick_y();
             let speed_y = if 0.5 > stick_y.abs() || stick_y.is_nan() {
                 0.0
             } else if stick_y <= 0.0 {

@@ -4,7 +4,7 @@ use super::*;
 // hdr: based on HDR's version (fighters/common/src/general_statuses/dash.rs)
 pub fn wm_param_to_int(boma: *mut app::BattleObjectModuleAccessor, param_cat: u64, param: u64, what: i32) {
     unsafe {
-        WorkModule::set_int(boma, WorkModule::get_param_int(boma, param_cat, param), what);
+        (*boma).set_int(WorkModule::get_param_int(boma, param_cat, param), what);
     }
 }
 
@@ -434,7 +434,7 @@ unsafe extern "C" fn status_dash_main_common(fighter: &mut L2CFighterCommon, arg
     );
     interrupt_if!(fighter.sub_ground_check_stop_wall().get_bool());
     if fighter.global_table[CURRENT_FRAME].get_i32() == 1
-    && StatusModule::prev_status_kind(fighter.module_accessor, 0) == *FIGHTER_STATUS_KIND_TURN
+    && fighter.boma().is_prev_status(*FIGHTER_STATUS_KIND_TURN)
     && StatusModule::prev_status_kind(fighter.module_accessor, 1) == *FIGHTER_STATUS_KIND_DASH
     && stick_x.abs() < dash_stick_x {
         VarModule::on_flag(fighter.battle_object, vars::common::instance::IS_LATE_PIVOT);
@@ -773,7 +773,7 @@ unsafe extern "C" fn status_turn_main(fighter: &mut L2CFighterCommon) -> L2CValu
         if fighter.global_table[SITUATION_KIND] == SITUATION_KIND_GROUND
         && stick_x * -1.0 * turn_work_lr < dash_stick_x
         && VarModule::is_flag(fighter.battle_object, vars::common::instance::IS_SMASH_TURN)
-        && StatusModule::prev_status_kind(fighter.module_accessor, 0) == *FIGHTER_STATUS_KIND_DASH
+        && fighter.boma().is_prev_status(*FIGHTER_STATUS_KIND_DASH)
         && fighter.motion_frame() == 1.0
         && VarModule::is_flag(fighter.battle_object, vars::common::instance::CAN_PERFECT_PIVOT) {
             VarModule::off_flag(fighter.battle_object, vars::common::instance::IS_SMASH_TURN);

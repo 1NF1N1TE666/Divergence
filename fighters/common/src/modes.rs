@@ -86,7 +86,7 @@ unsafe fn leave_air_only_status(boma: &mut BattleObjectModuleAccessor) -> bool {
 // real statuses, and the jump's end falls into WAIT
 unsafe fn leave_jump_to_shield(boma: &mut BattleObjectModuleAccessor) {
     if boma.is_status_one_of(&[*FIGHTER_STATUS_KIND_JUMP, *FIGHTER_STATUS_KIND_JUMP_AERIAL])
-    && ControlModule::check_button_on(boma, *CONTROL_PAD_BUTTON_GUARD) {
+    && boma.is_button_on(Buttons::Guard) {
         StatusModule::change_status_request_from_script(boma, *FIGHTER_STATUS_KIND_WAIT, false);
     }
 }
@@ -141,7 +141,7 @@ unsafe fn land(boma: &mut BattleObjectModuleAccessor) {
     VarModule::off_flag(boma.object(), vars::common::instance::FAUX_AIR_DIVE);
     VarModule::off_flag(boma.object(), vars::common::instance::FAUX_AIR_PASSING);
     VarModule::set_float(boma.object(), vars::common::instance::FAUX_AIR_SPEED_Y, 0.0);
-    WorkModule::set_int(boma, 0, *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
+    boma.set_int(0, *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
     StatusModule::set_situation_kind(boma, SituationKind(*SITUATION_KIND_GROUND), true);
     GroundModule::correct(boma, GroundCorrectKind(*GROUND_CORRECT_KIND_GROUND));
     GroundModule::attach_ground(boma, false);
@@ -151,8 +151,8 @@ unsafe fn land(boma: &mut BattleObjectModuleAccessor) {
 // claude code: walking off an edge or dropping through a platform. falls from a standstill and loses
 // the ground jump, like vanilla
 unsafe fn start_fall(boma: &mut BattleObjectModuleAccessor) {
-    let jump_count = WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
-    WorkModule::set_int(boma, jump_count.max(1), *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
+    let jump_count = boma.get_int(*FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
+    boma.set_int(jump_count.max(1), *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
     take_off(boma, 0.0);
 }
 
@@ -255,7 +255,7 @@ pub unsafe fn faux_air_request(boma: &mut BattleObjectModuleAccessor, status_kin
         *FIGHTER_STATUS_KIND_JUMP,
         *FIGHTER_STATUS_KIND_JUMP_AERIAL
     ].contains(&status_kind) {
-        let jump_count = WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
+        let jump_count = boma.get_int(*FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
         if jump_count < WorkModule::get_param_int(boma, hash40("jump_count_max"), 0) {
             return Some(*FIGHTER_STATUS_KIND_JUMP_AERIAL);
         }
@@ -291,7 +291,7 @@ pub unsafe fn faux_air_frame(fighter: &mut L2CFighterCommon) {
             start_fall(boma);
             return;
         }
-        WorkModule::set_int(boma, 0, *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
+        boma.set_int(0, *FIGHTER_INSTANCE_WORK_ID_INT_JUMP_COUNT);
         return;
     }
 
@@ -314,8 +314,8 @@ pub unsafe fn faux_air_frame(fighter: &mut L2CFighterCommon) {
     }
     if !VarModule::is_flag(boma.object(), vars::common::instance::FAUX_AIR_DIVE)
     && speed_y <= 0.0
-    && ControlModule::get_stick_y(boma) <= -WorkModule::get_param_float(boma, hash40("common"), hash40("dive_cont_value"))
-    && VarModule::get_int(boma.object(), vars::common::instance::LEFT_STICK_FLICK_Y) < WorkModule::get_param_int(boma, hash40("common"), hash40("dive_flick_frame_value")) {
+    && boma.stick_y() <= -boma.get_param_float("common", "dive_cont_value")
+    && VarModule::get_int(boma.object(), vars::common::instance::LEFT_STICK_FLICK_Y) < boma.get_param_int("common", "dive_flick_frame_value") {
         VarModule::on_flag(boma.object(), vars::common::instance::FAUX_AIR_DIVE);
         let dive_speed_y = WorkModule::get_param_float(boma, hash40("dive_speed_y"), 0);
         VarModule::set_float(boma.object(), vars::common::instance::FAUX_AIR_SPEED_Y, -dive_speed_y);
@@ -372,9 +372,12 @@ const MIN_SCALE_AURA: f32 = 0.6;
 const MAX_SCALE: f32 = 1.2;
 const MAX_SCALE_AURA: f32 = 1.35;
 
-// a common effect that loops on a joint, the closest to Lucario's hand aura in common (his own,
-// lucario_hadou, is in his effect bank, which nobody else has loaded)
-const AURA_EFFECT: &str = "sys_final_aura2";
+// Lucario's own hand aura (2026-11-27): his P_LucarioHadou emitter set, added to the common bank as
+// SYS_LUCARIO_HADOU (romfs/effect/system/common/ef_common.eff, set 199) so every fighter has it loaded.
+// a transplant into the system effects didn't load. if it never spawns (req_follow gives 0, e.g. another
+// mod's ef_common wins), the common effect closest to it, sys_final_aura2, is used instead
+const AURA_EFFECT: &str = "sys_lucario_hadou";
+const AURA_EFFECT_FALLBACK: &str = "sys_final_aura2";
 
 // weapons that attack but aren't projectiles: summons and held weapons keep their size
 const NOT_PROJECTILES: [i32; 6] = [0xE6, 0x9D, 0x8A, 0x1EC, 0x1AD, 0x1BE]; // ROSETTA_TICO, PIKMIN_PIKMIN, WARIO_WARIOBIKE, JACK_DOYLE, SIMON_WHIP, RICHTER_WHIP
@@ -404,7 +407,7 @@ unsafe fn stock_target(boma: &mut BattleObjectModuleAccessor) -> (f32, f32) {
     if manager.is_null() || function_hooks::is_cpu(boma) {
         return none;
     }
-    let own_entry = WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
+    let own_entry = boma.get_int(*FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID);
     let own_info = lua_bind::FighterManager::get_fighter_information(manager, FighterEntryID(own_entry));
     if own_info.is_null() {
         return none;
@@ -470,7 +473,7 @@ pub unsafe fn fighter_aura(boma: &mut BattleObjectModuleAccessor) -> f32 {
 
 // the fighter a weapon belongs to (the founder, past any weapons that made it), if it's an aura fighter
 unsafe fn weapon_owner(boma: &mut BattleObjectModuleAccessor) -> Option<&'static mut BattleObjectModuleAccessor> {
-    let id = WorkModule::get_int(boma, *WEAPON_INSTANCE_WORK_ID_INT_ACTIVATE_FOUNDER_ID) as u32;
+    let id = boma.get_int(*WEAPON_INSTANCE_WORK_ID_INT_ACTIVATE_FOUNDER_ID) as u32;
     if !sv_battle_object::is_active(id) || sv_battle_object::category(id) != *BATTLE_OBJECT_CATEGORY_FIGHTER {
         return None;
     }
@@ -613,7 +616,7 @@ const SPOT_CENTER: i32 = 3;
 // the model a mod folder has for this fighter's costume, found by the fighter's own name
 unsafe fn modded_model(boma: &mut BattleObjectModuleAccessor) -> Option<std::path::PathBuf> {
     let agent = boma.object().agent_kind_hash.hash;
-    let model = format!("model/body/c{:02}/model.numshb", WorkModule::get_int(boma, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR));
+    let model = format!("model/body/c{:02}/model.numshb", boma.get_int(*FIGHTER_INSTANCE_WORK_ID_INT_COLOR));
     config::entries("sd:/ultimate/mods")
         .filter(|folder| !folder.file_name().to_string_lossy().starts_with('.'))
         .flat_map(|folder| config::entries(folder.path().join("fighter")))
@@ -700,6 +703,9 @@ unsafe fn aura_effects(boma: &mut BattleObjectModuleAccessor, aura: f32) {
         let mut handle = VarModule::get_int(boma.object(), *id) as u32;
         if handle == 0 || !EffectModule::is_exist_effect(boma, handle) {
             handle = EffectModule::req_follow(boma, Hash40::new(AURA_EFFECT), Hash40::new(joint), &Vector3f::zero(), &Vector3f::zero(), size, false, 0, 0, 0, 0, 0, false, false) as u32;
+            if handle == 0 {
+                handle = EffectModule::req_follow(boma, Hash40::new(AURA_EFFECT_FALLBACK), Hash40::new(joint), &Vector3f::zero(), &Vector3f::zero(), size, false, 0, 0, 0, 0, 0, false, false) as u32;
+            }
             VarModule::set_int(boma.object(), *id, handle as i32);
         }
         if handle != 0 {

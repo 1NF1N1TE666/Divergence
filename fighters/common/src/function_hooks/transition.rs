@@ -21,7 +21,7 @@ unsafe fn is_enable_transition_term_hook(boma: &mut BattleObjectModuleAccessor, 
         *FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE_B,
         *FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_ESCAPE_AIR,
         // claude code: teching is removed: every tech (floor, roll, wall, walltech jump, ceiling) is
-        // switched off here, so a launch into a surface always bounces or knocks down. the defender's
+        // switched off here, so a launch into a surface always bounces or lands. the defender's
         // answer is DI, drift DI and SDI on the bounce instead (general_statuses/damage.rs)
         *FIGHTER_STATUS_TRANSITION_TERM_ID_PASSIVE,
         *FIGHTER_STATUS_TRANSITION_TERM_ID_PASSIVE_FB,
@@ -36,6 +36,10 @@ unsafe fn is_enable_transition_term_hook(boma: &mut BattleObjectModuleAccessor, 
     if boma.is_fighter()
     && [*FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_GUARD_ON, *FIGHTER_STATUS_TRANSITION_TERM_ID_CONT_GUARD].contains(&flag)
     && general_statuses::shield::is_shield_broken(boma) {
+        return false;
+    }
+    // claude code: no getups from a forced knockdown (general_statuses/down.rs)
+    if general_statuses::down::is_getup_locked(boma, flag) {
         return false;
     }
     // claude code: specials locked this airtime (universal no special fall)

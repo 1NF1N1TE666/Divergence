@@ -291,14 +291,12 @@ unsafe fn restarts_in_air(boma: &mut BattleObjectModuleAccessor, special: i32) -
     && !CancelModule::is_enable_cancel(boma)
 }
 
-// claude code: airdodges, spotdodges and rolls are removed. from a free state (standing, moving,
-// shielding, landing, falling, jumping, tumbling...) a dodge request is the player's input, and
-// refusing it leaves them where they were. any other status asking for a dodge is a move ending itself
-// into one it stored (shield-cancelling a charge, for one), and refusing that left them stuck, so it
-// becomes FALL in the air or WAIT on the ground. None = refuse, Some(kind) = change into kind, outer
-// None = not a dodge. the dodge inputs themselves are switched off (is_enable_transition_term_hook,
-// transition.rs), so the free-state refusal is only a backstop now
-unsafe fn removed_dodge_request(boma: &mut BattleObjectModuleAccessor, status_kind: i32) -> Option<Option<i32>> {
+// claude code: airdodges, spotdodges and rolls are removed. the dodge inputs are switched off
+// (is_enable_transition_term_hook, transition.rs), so a dodge request that still gets here is a move
+// ending itself into one it stored (shield-cancelling a charge, for one). refusing that left them
+// stuck, so it becomes FALL in the air or WAIT on the ground. Some(kind) = change into kind, None =
+// not a dodge
+unsafe fn removed_dodge_request(boma: &mut BattleObjectModuleAccessor, status_kind: i32) -> Option<i32> {
     if ![
         *FIGHTER_STATUS_KIND_ESCAPE_AIR,
         *FIGHTER_STATUS_KIND_ESCAPE,
@@ -307,45 +305,10 @@ unsafe fn removed_dodge_request(boma: &mut BattleObjectModuleAccessor, status_ki
     ].contains(&status_kind) {
         return None;
     }
-    if boma.is_status_one_of(&[
-        *FIGHTER_STATUS_KIND_WAIT,
-        *FIGHTER_STATUS_KIND_WALK,
-        *FIGHTER_STATUS_KIND_WALK_BRAKE,
-        *FIGHTER_STATUS_KIND_DASH,
-        *FIGHTER_STATUS_KIND_TURN,
-        *FIGHTER_STATUS_KIND_TURN_DASH,
-        *FIGHTER_STATUS_KIND_TURN_RUN,
-        *FIGHTER_STATUS_KIND_TURN_RUN_BRAKE,
-        *FIGHTER_STATUS_KIND_RUN,
-        *FIGHTER_STATUS_KIND_RUN_BRAKE,
-        *FIGHTER_STATUS_KIND_SQUAT,
-        *FIGHTER_STATUS_KIND_SQUAT_WAIT,
-        *FIGHTER_STATUS_KIND_SQUAT_F,
-        *FIGHTER_STATUS_KIND_SQUAT_B,
-        *FIGHTER_STATUS_KIND_SQUAT_RV,
-        *FIGHTER_STATUS_KIND_GUARD_ON,
-        *FIGHTER_STATUS_KIND_GUARD,
-        *FIGHTER_STATUS_KIND_GUARD_OFF,
-        *FIGHTER_STATUS_KIND_GUARD_DAMAGE,
-        *FIGHTER_STATUS_KIND_LANDING,
-        *FIGHTER_STATUS_KIND_LANDING_LIGHT,
-        *FIGHTER_STATUS_KIND_JUMP_SQUAT,
-        *FIGHTER_STATUS_KIND_FALL,
-        *FIGHTER_STATUS_KIND_FALL_AERIAL,
-        *FIGHTER_STATUS_KIND_FALL_SPECIAL,
-        *FIGHTER_STATUS_KIND_JUMP,
-        *FIGHTER_STATUS_KIND_JUMP_AERIAL,
-        *FIGHTER_STATUS_KIND_DAMAGE_FALL,
-        *FIGHTER_STATUS_KIND_PASS,
-        *FIGHTER_STATUS_KIND_WALL_JUMP,
-        *FIGHTER_STATUS_KIND_ATTACK_AIR
-    ]) {
-        return Some(None);
-    }
     if boma.is_situation(*SITUATION_KIND_GROUND) {
-        Some(Some(*FIGHTER_STATUS_KIND_WAIT))
+        Some(*FIGHTER_STATUS_KIND_WAIT)
     } else {
-        Some(Some(*FIGHTER_STATUS_KIND_FALL))
+        Some(*FIGHTER_STATUS_KIND_FALL)
     }
 }
 
@@ -581,10 +544,7 @@ unsafe fn change_status_request_from_script_hook(boma: &mut BattleObjectModuleAc
             return 0;
         }
         if let Some(kind) = removed_dodge_request(boma, status_kind) {
-            match kind {
-                Some(kind) => status_kind = kind,
-                None => return 0
-            }
+            status_kind = kind;
         }
     }
     let clear_buffer = clear_buffer && !modes::keeps_buffer(boma, status_kind);

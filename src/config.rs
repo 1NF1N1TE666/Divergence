@@ -1,10 +1,15 @@
 // claude code: Divergence's player settings, read from sd:/ultimate/divergence/config.toml. three
-// tables: [modes] turns roster-wide systems on (each one a bool, all off by default), [variants] turns
-// divergent variants off (any variant not listed is on), and [customs.<fighter>] gives costume slots
-// Sm4sh custom specials (below; a slot not listed has none). the file is read once, the first time
-// anything asks (config()), which happens at boot while fighters install. so changes need a restart.
-// with no file, a default one is written for the player to edit. a file that doesn't parse is logged
-// and the defaults are used, so a typo never stops the game
+// tables, and nothing is on unless the file adds it:
+// - [modes] adds roster-wide systems, each one `name = fixed` (always on), `name = rand` (a coin flip
+//   at boot) or `name = rand_solo` (a coin flip too, but only when no other mode came on, and if
+//   several rand_solo modes win theirs, one of them is picked evenly). resolved once at boot (resolve_modes)
+// - [variants] adds divergent variants, one name per line (marth_reflet), nothing else needed
+// - [customs.<fighter>] gives costume slots Sm4sh custom specials (below; a slot not listed has none)
+// fixed/rand/rand_solo and bare variant names aren't TOML, so the file is tidied into TOML first
+// (to_toml). the file is read once, the first time anything asks (config()), which happens at boot
+// while fighters install. so changes need a restart. with no file, a default one is written for the
+// player to edit. a file that doesn't parse is logged and the defaults are used, so a typo never
+// stops the game
 use crate::{consts::{globals::*, *}, ext::*, VarModule};
 use serde::Deserialize;
 use smash::app::{lua_bind::*, *};
@@ -19,31 +24,50 @@ const FOLDER: &str = "sd:/ultimate/divergence";
 const PATH: &str = "sd:/ultimate/divergence/config.toml";
 
 const DEFAULT_FILE: &str = "\
-[modes]
-faux_air = false
-aura = false
-
-[variants]
-# e.g. example = false
-
-# Sm4sh custom moves, slotted by costume. 4 numbers: neutral, side, up and down
-# (1 = default, 2 and 3 = customs). call characters by their names from the game's files.
 # e.g.
-# [customs.example]
-# c01 = \"1121\"
+#
+# [modes]
+# mode = fixed
+# mode = rand
+# mode = rand_solo
+#
+# [variants]
+# fighter_variant
+#
+# [customs.fighter]
+# cXX = \"1111\"
+# cXX = \"2222\"
+# cXX = \"3333\"
 ";
 
-#[derive(Deserialize, Default, Debug)]
-#[serde(default)]
+// the modes in play this boot, worked out from [modes] by resolve_modes
+#[derive(Default, Debug)]
 pub struct Modes {
     pub faux_air: bool,
     pub aura: bool,
 }
 
+impl Modes {
+    // turns a mode on by its config name. false for a name that isn't a mode
+    fn add(&mut self, name: &str) -> bool {
+        match name {
+            "faux_air" => self.faux_air = true,
+            "aura" => self.aura = true,
+            _ => return false
+        }
+        true
+    }
+}
+
 #[derive(Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
+    // mode -> fixed / rand / rand_solo, as written
+    #[serde(rename = "modes")]
+    mode_rules: BTreeMap<String, String>,
+    #[serde(skip)]
     pub modes: Modes,
+    // every variant the file lists (to_toml writes them as name = true)
     variants: BTreeMap<String, bool>,
     // fighter -> slot -> numbers, as written. slots that read right end up in custom_slots
     customs: BTreeMap<String, BTreeMap<String, toml::Value>>,
@@ -75,17 +99,90 @@ fn parse_numbers(value: &toml::Value) -> Option<[u8; 4]> {
     if valid { Some([numbers[0], numbers[1], numbers[2], numbers[3]]) } else { None }
 }
 
+// a random number below `count`, from the console's random number generator
+fn random_below(count: usize) -> usize {
+    let mut bytes = [0u8; 8];
+    unsafe { skyline::nn::os::GenerateRandomBytes(bytes.as_mut_ptr(), bytes.len() as u64); }
+    (u64::from_le_bytes(bytes) % count as u64) as usize
+}
+
+fn coin_flip() -> bool {
+    random_below(2) == 0
+}
+
+// the file as TOML: in [modes], a bare word after the = gets quotes (aura = rand -> aura = "rand"),
+// and in [variants], a line that's only a name becomes name = true. everything else is left as written
+fn to_toml(text: &str) -> String {
+    let mut table = String::new();
+    let mut out = String::new();
+    for line in text.lines() {
+        let code = line.split('#').next().unwrap_or("").trim();
+        if code.starts_with('[') {
+            table = code.trim_matches(|c| c == '[' || c == ']').trim().to_string();
+        } else if table == "modes" {
+            if let Some((name, value)) = code.split_once('=') {
+                out.push_str(&format!("{} = \"{}\"\n", name.trim(), value.trim().trim_matches('"')));
+                continue;
+            }
+        } else if table == "variants" && !code.is_empty() && !code.contains('=') {
+            out.push_str(&format!("{} = true\n", code.trim_matches('"')));
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
 impl Config {
+    // fixed modes come on, rand modes on a coin flip each. then, only if none of those came on, every
+    // rand_solo mode flips its own coin, and one of the winners is picked evenly
+    fn resolve_modes(&mut self) {
+        let mut any = false;
+        let mut solo = vec![];
+        for (name, rule) in &self.mode_rules {
+            let add = match rule.as_str() {
+                "fixed" => true,
+                "rand" => coin_flip(),
+                "rand_solo" => {
+                    if coin_flip() {
+                        solo.push(name.as_str());
+                    }
+                    continue;
+                }
+                _ => {
+                    crate::log(&format!("[Divergence] modes: {} = {} skipped, it should be fixed, rand or rand_solo", name, rule));
+                    continue;
+                }
+            };
+            if !add {
+                continue;
+            }
+            if self.modes.add(name) {
+                any = true;
+            } else {
+                crate::log(&format!("[Divergence] modes: no mode called {}", name));
+            }
+        }
+        if !any && !solo.is_empty() {
+            let name = solo[random_below(solo.len())];
+            if !self.modes.add(name) {
+                crate::log(&format!("[Divergence] modes: no mode called {}", name));
+            }
+        }
+    }
+
     fn load() -> Config {
         let text = std::fs::read_to_string(PATH).unwrap_or_else(|_| {
             let _ = std::fs::create_dir_all(FOLDER);
             let _ = std::fs::write(PATH, DEFAULT_FILE);
             DEFAULT_FILE.to_string()
         });
-        let mut config: Config = toml::from_str(&text).unwrap_or_else(|error| {
+        let mut config: Config = toml::from_str(&to_toml(&text)).unwrap_or_else(|error| {
             crate::log(&format!("[Divergence] {} didn't parse, using defaults: {}", PATH, error));
             Config::default()
         });
+        config.resolve_modes();
         crate::log(&format!("[Divergence] config: {:?}", config.modes));
         for (fighter, slots) in &config.customs {
             for (slot, numbers) in slots {
@@ -98,9 +195,9 @@ impl Config {
         config
     }
 
-    // a variant is on unless the file says false
+    // a variant is on when the file lists it
     pub fn variant_enabled(&self, name: &str) -> bool {
-        self.variants.get(name).copied().unwrap_or(true)
+        self.variants.get(name).copied().unwrap_or(false)
     }
 }
 
@@ -192,7 +289,7 @@ pub unsafe fn fighter_of(boma: *mut BattleObjectModuleAccessor) -> Option<*mut B
     if category != *BATTLE_OBJECT_CATEGORY_WEAPON {
         return None;
     }
-    let owner_id = WorkModule::get_int(boma, *WEAPON_INSTANCE_WORK_ID_INT_ACTIVATE_FOUNDER_ID) as u32;
+    let owner_id = (*boma).get_int(*WEAPON_INSTANCE_WORK_ID_INT_ACTIVATE_FOUNDER_ID) as u32;
     if !sv_battle_object::is_active(owner_id) {
         return None;
     }
@@ -233,7 +330,7 @@ pub unsafe fn is_custom(boma: *mut BattleObjectModuleAccessor, fighter: &str) ->
     if marked.is_empty() {
         return false;
     }
-    let slot = WorkModule::get_int(owner, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR);
+    let slot = (*owner).get_int(*FIGHTER_INSTANCE_WORK_ID_INT_COLOR);
     slot >= 0 && marked.contains(&(slot as usize))
 }
 
@@ -486,7 +583,7 @@ pub unsafe fn custom_number(boma: *mut BattleObjectModuleAccessor, special: Spec
         Some(owner) if registered(owner).is_some() => owner,
         _ => return 1
     };
-    let number = WorkModule::get_int(owner, *FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_N_NO + special as i32);
+    let number = (*owner).get_int(*FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_N_NO + special as i32);
     number.max(0) as u8 + 1
 }
 
@@ -523,8 +620,8 @@ pub unsafe fn custom_status(fighter: &mut L2CFighterCommon, special: Special, st
 
 // WAZA_CUSTOMIZE_CONTROL: waza_customize runs this once it has written the numbers
 unsafe extern "C" fn customs_control(fighter: &mut L2CFighterCommon) -> L2CValue {
-    let org = WorkModule::get_int(fighter.module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_WAZA_CUSTOMIZE_ORG);
-    let to = WorkModule::get_int(fighter.module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_WAZA_CUSTOMIZE_TO);
+    let org = fighter.boma().get_int(*FIGHTER_INSTANCE_WORK_ID_INT_WAZA_CUSTOMIZE_ORG);
+    let to = fighter.boma().get_int(*FIGHTER_INSTANCE_WORK_ID_INT_WAZA_CUSTOMIZE_TO);
     let special = match Special::ALL.iter().find(|special| *FIGHTER_STATUS_KIND_SPECIAL_N + **special as i32 == org) {
         Some(special) => *special,
         None => return 0.into()
@@ -568,7 +665,7 @@ unsafe extern "C" fn customs_frame(fighter: &mut L2CFighterCommon) {
         Some(registered) => registered,
         None => return
     };
-    let slot = WorkModule::get_int(fighter.module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR);
+    let slot = fighter.boma().get_int(*FIGHTER_INSTANCE_WORK_ID_INT_COLOR);
     let request = config().custom_slots.iter()
         .find(|request| request.fighter == registered.fighter && request.slot as i32 == slot);
     if let Some(request) = request {

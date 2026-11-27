@@ -1,3 +1,4 @@
+**/dev
 **/target
 **/Cargo.lock
 **/cpp.rs
