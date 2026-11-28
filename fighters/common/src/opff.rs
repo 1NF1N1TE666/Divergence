@@ -123,6 +123,7 @@ pub unsafe fn sys_line_system_control_fighter_hook(fighter: &mut L2CFighterCommo
     right_stick_flick_counter(fighter);
     general_statuses::shield::parry_reward(fighter);
     general_statuses::damage::bounce_collision(fighter);
+    general_statuses::damage::ground_meteor_rebound(fighter);
     general_statuses::damage::record_launch_speed(fighter);
     general_statuses::down::forced_down(fighter);
     general_statuses::sdi_reset(fighter);

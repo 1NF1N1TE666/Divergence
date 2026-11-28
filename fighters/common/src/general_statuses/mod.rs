@@ -71,13 +71,6 @@ pub unsafe fn try_wall_jump(fighter: &mut L2CFighterCommon) -> bool {
         return false;
     }
 
-    let attach_wall_type = WorkModule::get_param_int(fighter.module_accessor, hash40("attach_wall_type"), 0);
-    if attach_wall_type == *FIGHTER_ATTACH_WALL_TYPE_NORMAL
-    && fighter.sub_fighter_general_term_is_can_attach_wall().get_bool() {
-        fighter.change_status(FIGHTER_STATUS_KIND_ATTACH_WALL.into(), true.into());
-        return true;
-    }
-
     let wall_jump_type = WorkModule::get_param_int(fighter.module_accessor, hash40("wall_jump_type"), 0);
     if wall_jump_type == *FIGHTER_WALL_JUMP_TYPE_NORMAL
     && fighter.boma().is_button_trigger(Buttons::Jump)
@@ -99,8 +92,7 @@ pub unsafe fn try_wall_jump(fighter: &mut L2CFighterCommon) -> bool {
 // (wall_jump_enable_x_speed), and only took what the engine calls a wall touch (GroundModule::is_touch
 // LEFT/RIGHT + is_attachable), which leaves slanted walls out. the wall is found the way the tether's
 // lasso::find_wall finds one: a ray, the angle read off the wall's normal, here 4 and 10 units up from
-// their feet and 8 out to each side (all times their scale). the nearest wall wins. wall clings
-// (attach_wall_type, above) keep vanilla's check
+// their feet and 8 out to each side (all times their scale). the nearest wall wins
 const WALL_REACH: f32 = 8.0;
 const WALL_HEIGHTS: [f32; 2] = [4.0, 10.0];
 
@@ -142,6 +134,13 @@ unsafe fn sub_transition_group_check_air_wall_jump(fighter: &mut L2CFighterCommo
         }
     }
     try_wall_jump(fighter).into()
+}
+
+// claude code: no wall clings for anyone (2026-11-27). every wall is a wall jump instead (try_wall_jump
+// above). the game asks this before any fighter clings, so a no here covers every path into ATTACH_WALL
+#[skyline::hook(replace = L2CFighterCommon_sub_fighter_general_term_is_can_attach_wall)]
+unsafe fn sub_fighter_general_term_is_can_attach_wall(_fighter: &mut L2CFighterCommon) -> L2CValue {
+    false.into()
 }
 
 #[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_status_Landing_MainSub)]
@@ -328,7 +327,8 @@ fn nro_hook(info: &skyline::nro::NroInfo) {
             status_FallSub_hook,
             end_pass_ground,
             sub_is_dive,
-            sub_transition_group_check_air_wall_jump
+            sub_transition_group_check_air_wall_jump,
+            sub_fighter_general_term_is_can_attach_wall
         );
     }
 }

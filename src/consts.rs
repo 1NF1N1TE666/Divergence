@@ -71,7 +71,6 @@ pub mod vars {
             pub const IS_LATE_PIVOT: i32 = 0x0007;
             pub const CAN_PERFECT_PIVOT: i32 = 0x0008;
             pub const IS_SMASH_TURN: i32 = 0x0009;
-            pub const FORCE_KNOCKDOWN: i32 = 0x000B;
             pub const IS_GETTING_POSITION_FOR_ECB: i32 = 0x000D;
             // claude code: universal no special fall, "used this airtime" locks
             pub const SPECIAL_N_USED: i32 = 0x0010;
@@ -106,7 +105,8 @@ pub mod vars {
             pub const SPECIALS_FORCED: i32 = 0x0048; // inside the air special check, refreshed specials let through
             // claude code: shield breaks (fighters/common/src/general_statuses/shield.rs)
             pub const SHIELD_BROKEN: i32 = 0x0050; // shield broke this stock, no shield until respawn
-            pub const KNOCKED_DOWN: i32 = 0x0051; // claude code: launched by a FORCE_KNOCKDOWN hit, lands in the getup-less down (general_statuses/down.rs)
+            pub const DOWN_STARTED: i32 = 0x0051; // claude code: this down's lying time is set (general_statuses/down.rs)
+            pub const THROW_PENDING: i32 = 0x0052; // claude code: a throw hit them; its numbers are in THROW_* (general_statuses/down.rs)
 
             // ints
             pub const LEFT_STICK_FLICK_X: i32 = 0x0003;
@@ -125,7 +125,7 @@ pub mod vars {
             pub const AURA_EFFECT_L: i32 = 0x0010; // claude code: aura mode's left effect handle, 0 = none
             pub const AURA_EFFECT_R: i32 = 0x0011; // claude code: aura mode's right effect handle, 0 = none
             pub const AURA_SPOT: i32 = 0x0012; // claude code: aura mode, where the effect goes (modes.rs, SPOT_*), 0 = not worked out yet
-            pub const DOWN_FRAME: i32 = 0x0013; // claude code: frames spent lying in a forced knockdown (general_statuses/down.rs)
+            pub const DOWN_FRAME: i32 = 0x0013; // claude code: lying frames left before they can act (general_statuses/down.rs)
 
             // floats
             pub const ECB_BOTTOM_Y_OFFSET: i32 = 0x0006;
@@ -135,6 +135,11 @@ pub mod vars {
             pub const TETHER_WALL_X: i32 = 0x000A; // claude code: where a tether is latched (general_statuses/lasso.rs)
             pub const TETHER_WALL_Y: i32 = 0x000B;
             pub const TETHER_WALL_LR: i32 = 0x000C; // claude code: the way to the wall
+            // claude code: the last throw hit on them, for a grab slam's lying time (general_statuses/down.rs)
+            pub const THROW_DAMAGE: i32 = 0x000E;
+            pub const THROW_KBG: i32 = 0x000F;
+            pub const THROW_FKB: i32 = 0x0010;
+            pub const THROW_BKB: i32 = 0x0011;
             pub const LAUNCH_SPEED_Y: i32 = 0x000D; // claude code: a launch's vertical speed (knockback + gravity) last airborne frame (general_statuses/damage.rs)
             pub const FAUX_AIR_SPEED_Y: i32 = 0x0020; // claude code: faux vertical speed, kept across status changes
             // claude code: aura mode (fighters/common/src/modes.rs)
@@ -150,11 +155,12 @@ pub mod vars {
             pub const IS_DASH_TO_RUN_FRAME: i32 = 0x1002;
             pub const IS_AFTER_DASH_TO_RUN_FRAME: i32 = 0x1003;
             pub const CHECK_HOLD_INPUT: i32 = 0x1011;
-            pub const FORCE_OPPONENT_KNOCKDOWN: i32 = 0x1012; // claude code: fighters this status hits get FORCE_KNOCKDOWN
             pub const EDGE_STOP_SLIPPED: i32 = 0x1013; // claude code: this status asked to stop at edges and got plain ground correction instead
             pub const SLID_OFF_OWN_STATUS: i32 = 0x1014; // claude code: it slid off and runs on in the air under slide-off physics (opff.rs)
             pub const AURA_STATUS_ATTACKED: i32 = 0x1015; // claude code: this fighter-specific status has had a hitbox out, so it's a move (modes.rs)
             pub const BOUNCE_RELEASED: i32 = 0x1016; // claude code: this bounce's DI and ASDI are done (general_statuses/damage.rs)
+            pub const GROUND_METEOR_REBOUND: i32 = 0x1012; // claude code: this grounded spike's rebound is set (general_statuses/damage.rs)
+            pub const BOUNCE_AIRBORNE: i32 = 0x1017; // claude code: this floor bounce has left the floor again (general_statuses/damage.rs)
 
             // ints
 

@@ -198,6 +198,12 @@ pub unsafe fn is_bounce_freeze(fighter: &mut L2CFighterCommon) -> bool {
 // claude code: held SDI through the freeze, then DI and ASDI once on the first frame out of it. runs
 // every frame from sys_line_system_control_fighter (opff.rs)
 pub unsafe fn bounce_collision(fighter: &mut L2CFighterCommon) {
+    // claude code: a floor bounce that has left the floor again can floor-bounce once more (reflect_d_main)
+    if fighter.is_status(*FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D)
+    && VarModule::is_flag(fighter.battle_object, vars::common::status::BOUNCE_RELEASED)
+    && fighter.is_situation(*SITUATION_KIND_AIR) {
+        VarModule::on_flag(fighter.battle_object, vars::common::status::BOUNCE_AIRBORNE);
+    }
     if !is_bounce_status(fighter.status())
     || VarModule::is_flag(fighter.battle_object, vars::common::status::BOUNCE_RELEASED) {
         return;
@@ -209,8 +215,44 @@ pub unsafe fn bounce_collision(fighter: &mut L2CFighterCommon) {
         return;
     }
     VarModule::on_flag(fighter.battle_object, vars::common::status::BOUNCE_RELEASED);
+    if fighter.is_status(*FIGHTER_STATUS_KIND_DAMAGE_FLY_REFLECT_D) {
+        floor_rebound(fighter);
+    }
     bounce_di(fighter);
     asdi(fighter, 1.0);
+}
+
+// claude code: a spike on a grounded fighter never goes through a floor bounce: vanilla turns it into a
+// DAMAGE_FLY_METEOR launch straight up off the ground at its own (killing) speed, with the status's
+// FIGHTER_STATUS_DAMAGE_FLAG_GROUND on (seen in game 2026-11-27 trace: ground hit, METEOR, speed (0, 5.42)).
+// it gets the same rebound as a floor bounce (floor_rebound): on the first airborne frame of the launch,
+// the upward speed is set to their fall speed and the sideways speed is left alone. once per launch
+// (GROUND_METEOR_REBOUND). runs every frame from sys_line_system_control_fighter (opff.rs)
+pub unsafe fn ground_meteor_rebound(fighter: &mut L2CFighterCommon) {
+    if !fighter.is_status(*FIGHTER_STATUS_KIND_DAMAGE_FLY_METEOR)
+    || !fighter.is_situation(*SITUATION_KIND_AIR)
+    || StopModule::is_stop(fighter.module_accessor)
+    || VarModule::is_flag(fighter.battle_object, vars::common::status::GROUND_METEOR_REBOUND)
+    || !fighter.is_flag(*FIGHTER_STATUS_DAMAGE_FLAG_GROUND) {
+        return;
+    }
+    VarModule::on_flag(fighter.battle_object, vars::common::status::GROUND_METEOR_REBOUND);
+    if fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE) <= 0.0 {
+        // going down off the ground (off a ledge): no rebound to set
+        return;
+    }
+    floor_rebound(fighter);
+}
+
+// claude code: a floor bounce rebounds up at the bounced fighter's own fall speed (`air_speed_y_stable`),
+// whatever hit them and however fast they came down (2026-11-27, Grant's design). only the vertical speed
+// is set: the launch's horizontal momentum carries through the bounce untouched. a string off the floor
+// lasts until the attacker drops it or the fighter DIs, drift DIs and SDIs/ASDIs out, not on how hard the
+// move hit
+unsafe fn floor_rebound(fighter: &mut L2CFighterCommon) {
+    let fall_speed = fighter.get_param_float("air_speed_y_stable", "");
+    let speed_x = fighter.get_speed_x(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
+    fighter.set_speed(Vector2f::new(speed_x, fall_speed), *FIGHTER_KINETIC_ENERGY_ID_DAMAGE);
 }
 
 // claude code: every launch that lands while still in hitstun floor-bounces, not just spikes. vanilla's
@@ -222,8 +264,8 @@ pub unsafe fn bounce_collision(fighter: &mut L2CFighterCommon) {
 // (knockback + gravity, from its last airborne frame) to the knockback energy first, so the landing
 // looks like a spike to the check and vanilla bounces it the same way. gravity is zeroed with it (its
 // share is in the knockback energy now). the "last bounce wasn't off the floor" rule is dropped too, so
-// floor bounces can chain; `damage_fly_reflect_max` still caps the total. KNOCKED_DOWN launches have
-// the floor-bounce term off, so they still land
+// floor bounces can chain; `damage_fly_reflect_max` still caps the total. the rebound itself is set to
+// the fighter's fall speed as the freeze ends (floor_rebound)
 unsafe fn launch_statuses() -> [i32; 6] {
     [
         *FIGHTER_STATUS_KIND_DAMAGE_FLY,
@@ -235,10 +277,14 @@ unsafe fn launch_statuses() -> [i32; 6] {
     ]
 }
 
-// claude code: every frame (sys_line, opff.rs): the launch's vertical speed while it's airborne
+// claude code: every frame (sys_line, opff.rs): the launch's vertical speed while it's airborne, 0 outside a launch
 pub unsafe fn record_launch_speed(fighter: &mut L2CFighterCommon) {
-    if !fighter.is_situation(*SITUATION_KIND_AIR)
-    || !fighter.is_status_one_of(&launch_statuses()) {
+    if !fighter.is_status_one_of(&launch_statuses()) {
+        // a launch that starts on the ground (a grounded spike) never reads the last launch's speed
+        VarModule::set_float(fighter.battle_object, vars::common::instance::LAUNCH_SPEED_Y, 0.0);
+        return;
+    }
+    if !fighter.is_situation(*SITUATION_KIND_AIR) {
         return;
     }
     let speed_y = fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_DAMAGE) + fighter.get_speed_y(*FIGHTER_KINETIC_ENERGY_ID_GRAVITY);
@@ -268,6 +314,28 @@ unsafe fn sub_AirChkDamageReflectFloor_hook(fighter: &mut L2CFighterCommon) -> L
                 fighter.set_int(last_dir, *FIGHTER_STATUS_WORK_ID_INT_DAMAGE_REFLECT_LAST_DIR);
             }
             return ret;
+        }
+    }
+    call_original!(fighter)
+}
+
+// claude code: vanilla's floor bounce status (DAMAGE_FLY_REFLECT_D) checks for wall and ceiling bounces
+// but never the floor (status_DamageFlyReflectD_Main, lua2cpp_common, decompiled 2026-11-27), so a
+// fighter still in hitstun after one floor bounce landed and lay down (in game trace 2026-11-27: REFLECT_D
+// straight to DOWN with 49 frames of hitstun left). once the bounce has left the floor (BOUNCE_AIRBORNE),
+// this runs the same floor check DAMAGE_FLY does first, so a launch in hitstun keeps bouncing until
+// `damage_fly_reflect_max` (the check's own cap) runs out. only while hitstun is left: out of hitstun the
+// bounce lands (in game trace: with no hitstun gate it bounced forever)
+#[skyline::hook(replace = L2CFighterCommon_status_DamageFlyReflectD_Main)]
+unsafe fn status_DamageFlyReflectD_Main_hook(fighter: &mut L2CFighterCommon) -> L2CValue {
+    if VarModule::is_flag(fighter.battle_object, vars::common::status::BOUNCE_AIRBORNE)
+    && fighter.get_float(*FIGHTER_INSTANCE_WORK_ID_FLOAT_DAMAGE_REACTION_FRAME) > 0.0
+    && fighter.is_situation(*SITUATION_KIND_GROUND)
+    && !FighterStopModuleImpl::is_damage_stop(fighter.module_accessor) {
+        // the bounce status has the floor bounce's own term off
+        fighter.enable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D);
+        if fighter.sub_AirChkDamageReflectFloor().get_bool() {
+            return 0.into();
         }
     }
     call_original!(fighter)
@@ -415,29 +483,6 @@ pub unsafe fn FighterStatusDamage__correctDamageVectorEffect(fighter: &mut L2CFi
     ret
 }
 
-// claude code: a FORCE_KNOCKDOWN hit marks its launch KNOCKED_DOWN, which lasts through the launch's
-// wall and ceiling bounces (they run this again) and ends on any other new launch. a KNOCKED_DOWN
-// launch never floor-bounces, so it lands in the getup-less down (down.rs)
-#[skyline::hook(replace = smash::lua2cpp::L2CFighterCommon_sub_DamageFlyCommon_init)]
-pub unsafe fn damage_fly_common_init(fighter: &mut L2CFighterCommon) {
-    let force_knockdown = VarModule::is_flag(fighter.battle_object, vars::common::instance::FORCE_KNOCKDOWN);
-    VarModule::off_flag(fighter.battle_object, vars::common::instance::FORCE_KNOCKDOWN);
-    if force_knockdown {
-        VarModule::on_flag(fighter.battle_object, vars::common::instance::KNOCKED_DOWN);
-    } else if !is_bounce_status(fighter.status()) {
-        VarModule::off_flag(fighter.battle_object, vars::common::instance::KNOCKED_DOWN);
-    }
-    let knocked_down = VarModule::is_flag(fighter.battle_object, vars::common::instance::KNOCKED_DOWN);
-    if knocked_down {
-        fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D);
-    }
-    original!()(fighter);
-    // claude code: and again once the original has run
-    if knocked_down {
-        fighter.unable_transition_term(*FIGHTER_STATUS_TRANSITION_TERM_ID_DAMAGE_FLY_REFLECT_D);
-    }
-}
-
 pub unsafe extern "C" fn non_tumble_di(fighter: &mut L2CFighterCommon) {
     if fighter.is_status(*FIGHTER_STATUS_KIND_DAMAGE_AIR) {
         fighter.FighterStatusDamage__correctDamageVectorEffect(L2CValue::Bool(false));
@@ -480,11 +525,11 @@ fn nro_hook(info: &skyline::nro::NroInfo) {
         skyline::install_hooks!(
             FighterStatusUniqProcessDamage_leave_stop_hook,
             status_DamageFly_Main_hook,
+            status_DamageFlyReflectD_Main_hook,
             sub_AirChkDamageReflectFloor_hook,
             exec_damage_elec_hit_stop_hook,
             virtual_ftStatusUniqProcessDamage_exec_common,
-            FighterStatusDamage__correctDamageVectorEffect,
-            damage_fly_common_init
+            FighterStatusDamage__correctDamageVectorEffect
         );
     }
 }

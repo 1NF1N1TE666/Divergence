@@ -31,7 +31,12 @@ unsafe fn attack_abs_replace(lua_state: u64) {
     l2c_agent.clear_lua_stack();
     let is_throw = params[0].get_i32() == *FIGHTER_ATTACK_ABSOLUTE_KIND_THROW;
     // claude code: aura mode, throws and other set hits times Aura too (modes.rs)
-    let aura = modes::power_mul(&mut *sv_system::battle_object_module_accessor(lua_state));
+    let attacker = sv_system::battle_object_module_accessor(lua_state);
+    let aura = modes::power_mul(&mut *attacker);
+    if is_throw {
+        let mul = 1.2 * aura;
+        note_throw(attacker, params[2].get_f32() * mul, params[4].get_i32() as f32, params[5].get_i32() as f32, params[6].get_i32() as f32);
+    }
     for i in 0..16 {
         if i == 2 {
             let mul = if is_throw { 1.2 } else { 1.0 };
@@ -57,22 +62,20 @@ unsafe extern "C" fn attack_module_set_power_hook_pattern(ctx: &mut skyline::hoo
     ctx.registers_f[2].set_s(1.0);
 }
 
-// claude code: every hit on a fighter is logged here (FighterManager::notify_log_event_collision_hit,
-// whose lua_bind wrapper jumps to this function). an attacking fighter whose status has
-// FORCE_OPPONENT_KNOCKDOWN on gives the fighter it hit FORCE_KNOCKDOWN (no floor bounce, no tech)
-#[skyline::hook(offset = 0x67a7b0)]
-unsafe fn notify_log_event_collision_hit(fighter_manager: u64, attacker_id: u32, defender_id: u32, power: f32, collision_kind: i32, flag: bool) -> u64 {
-    if sv_battle_object::is_active(attacker_id)
-    && sv_battle_object::is_active(defender_id) {
-        let attacker = sv_battle_object::module_accessor(attacker_id);
-        let defender = sv_battle_object::module_accessor(defender_id);
-        if (*attacker).is_fighter()
-        && (*defender).is_fighter()
-        && VarModule::is_flag((*attacker).object(), vars::common::status::FORCE_OPPONENT_KNOCKDOWN) {
-            VarModule::on_flag((*defender).object(), vars::common::instance::FORCE_KNOCKDOWN);
-        }
+// claude code: a throw hit on the fighter this one holds (capture link) keeps its numbers on them, for
+// a grab slam's lying time (general_statuses/down.rs)
+unsafe fn note_throw(attacker: *mut BattleObjectModuleAccessor, damage: f32, kbg: f32, fkb: f32, bkb: f32) {
+    if !(*attacker).is_fighter() {
+        return;
     }
-    call_original!(fighter_manager, attacker_id, defender_id, power, collision_kind, flag)
+    let id = LinkModule::get_node_object_id(attacker, *LINK_NO_CAPTURE) as u32;
+    if id == *BATTLE_OBJECT_ID_INVALID as u32 || !sv_battle_object::is_active(id) {
+        return;
+    }
+    let victim = sv_battle_object::module_accessor(id);
+    if (*victim).is_fighter() {
+        crate::fighters::common::general_statuses::down::note_throw(victim, damage, kbg, fkb, bkb);
+    }
 }
 
 pub fn install() {
@@ -80,7 +83,6 @@ pub fn install() {
         attack_replace,
         attack_abs_replace,
         get_hitstop_mul,
-        attack_module_set_power_hook_pattern,
-        notify_log_event_collision_hit
+        attack_module_set_power_hook_pattern
     );
 }
